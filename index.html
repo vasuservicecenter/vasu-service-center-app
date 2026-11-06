@@ -136,7 +136,7 @@ document.getElementById("bookingForm").addEventListener("submit", async (e) => {
   const { data, error } = await db.rpc("submit_public_booking", {
     p_customer_name: document.getElementById("name").value.trim(),
     p_mobile: mobile,
-    p_registration: document.getElementById("registration").value.trim(),
+    p_registration_number: document.getElementById("registration").value.trim(),
     p_brand: document.getElementById("brand").value.trim(),
     p_model: document.getElementById("model").value.trim(),
     p_booking_date: document.getElementById("date").value,
