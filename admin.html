@@ -407,10 +407,8 @@ async function saveJobCard() {
     return;
   }
 
-  const jobNumber = "VSC-" + Date.now();
 
   const jobData = {
-    job_number: jobNumber,
     customer_id: customerId,
     bike_id: bikeId,
     odometer: document.getElementById("jobOdometer").value
@@ -428,16 +426,18 @@ async function saveJobCard() {
     payment_status: "unpaid"
   };
 
-  const { error } = await db
-    .from("job_cards")
-    .insert(jobData);
+  const { data: savedJob, error } = await db
+  .from("job_cards")
+  .insert(jobData)
+  .select("job_number")
+  .single();
 
   if (error) {
     showMessage("Job card failed: " + error.message);
     return;
   }
 
-  showMessage("Job card created! Number: " + jobNumber);
+  showMessage("Job card created! Number: " + savedJob.job_number);
 
   document.getElementById("jobForm").reset();
   document.getElementById("jobForm").classList.add("hidden");
