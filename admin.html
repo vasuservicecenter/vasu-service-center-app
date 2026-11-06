@@ -51,9 +51,21 @@ button{padding:12px 17px;border:0;border-radius:5px;background:var(--yellow);fon
   </div>
 
   <div class="card">
-    <h2>📥 Booking Requests</h2>
-    <div id="bookings">Loading bookings...</div>
-  </div>
+  <h2>📥 Booking Management</h2>
+
+  <select id="statusFilter"
+    onchange="loadBookings()"
+    style="width:100%;padding:14px;margin:10px 0;background:#101010;color:white;border:1px solid #ffd400;border-radius:5px;">
+
+    <option value="all">ALL BOOKINGS</option>
+    <option value="pending">PENDING</option>
+    <option value="approved">APPROVED</option>
+    <option value="completed">COMPLETED</option>
+    <option value="rejected">REJECTED</option>
+  </select>
+
+  <div id="bookings">Loading bookings...</div>
+</div>
 </div>
 
 <p id="message"></p>
