@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101010">
+<title>Vasu Service Center | Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101010;color:white;font-family:Arial,sans-serif}
+:root{--yellow:#ffd400}
+header{padding:20px;background:#080808;border-bottom:1px solid #333}
+header span{color:var(--yellow)}
+main{max-width:950px;margin:auto;padding:22px}
+.card{background:#1b1b1b;border:1px solid #333;border-radius:10px;padding:20px;margin-bottom:16px}
+h2{margin-top:0}
+input{width:100%;padding:14px;margin:8px 0;background:#101010;color:white;border:1px solid #555;border-radius:5px}
+button{padding:12px 17px;border:0;border-radius:5px;background:var(--yellow);font-weight:bold;cursor:pointer;margin:5px 4px 5px 0}
+.reject{background:#b52b2b;color:white}
+.secondary{background:#444;color:white}
+.small{color:#aaa;font-size:13px}
+.hidden{display:none}
+#message{color:var(--yellow);margin:12px 0}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>VASU <span>SERVICE CENTER</span></h2>
+  <div class="small">OWNER ADMIN DASHBOARD</div>
+</header>
+
+<main>
+
+<div id="login" class="card">
+  <h2>Owner Login 🔐</h2>
+  <input id="email" type="email" placeholder="Owner email">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">LOGIN</button>
+</div>
+
+<div id="dashboard" class="hidden">
+  <div class="card">
+    <h2>Welcome, <span id="ownerName">Owner</span>!</h2>
+    <p>Manage your workshop bookings.</p>
+    <button onclick="loadBookings()">REFRESH BOOKINGS</button>
+    <button class="secondary" onclick="logout()">LOGOUT</button>
+  </div>
+
+  <div class="card">
+    <h2>📥 Booking Requests</h2>
+    <div id="bookings">Loading bookings...</div>
+  </div>
+</div>
+
+<p id="message"></p>
+
+</main>
+
+<script>
+const SUPABASE_URL = "https://mrzeumnbuapspudelgcd.supabase.co";
+const SUPABASE_KEY = "PASTE_YOUR_EXISTING_PUBLISHABLE_KEY_HERE";
+
+const db = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+const loginBox = document.getElementById("login");
+const dashboard = document.getElementById("dashboard");
+const message = document.getElementById("message");
+
+let currentUser = null;
+
+function showMessage(text) {
+  message.textContent = text;
+}
+
+async function login() {
+  showMessage("Signing in...");
+
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  const {data,error} = await db.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if(error) {
+    showMessage("Login failed: " + error.message);
+    return;
+  }
+
+  await checkOwner(data.user);
+}
+
+async function checkOwner(user) {
+  if(!user) {
+    showMessage("Please log in.");
+    return;
+  }
+
+  showMessage("Checking account permissions...");
+
+  const {data,error} = await db
+    .from("admin_accounts")
+    .select("id,full_name,role,is_active")
+    .eq("id",user.id)
+    .maybeSingle();
+
+  if(error || !data || data.is_active !== true ||
+     !["owner","staff"].includes(data.role)) {
+
+    await db.auth.signOut();
+    showMessage("Access denied. Active workshop account required.");
+    return;
+  }
+
+  currentUser = user;
+
+  document.getElementById("ownerName").textContent =
+    data.full_name || "Owner";
+
+  loginBox.classList.add("hidden");
+  dashboard.classList.remove("hidden");
+
+  await loadBookings();
+}
+
+async function loadBookings() {
+  const area = document.getElementById("bookings");
+  area.textContent = "Loading bookings...";
+
+  const {data,error} = await db
+    .from("bookings")
+    .select("id,customer_id,bike_id,booking_date,booking_time,service_requested,status,customer_notes,created_at")
+    .order("created_at",{ascending:false});
+
+  if(error) {
+    area.textContent = "Could not load bookings: " + error.message;
+    return;
+  }
+
+  area.replaceChildren();
+
+  if(!data || data.length === 0) {
+    area.textContent = "No bookings received yet.";
+    return;
+  }
+
+  data.forEach(booking => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.textContent =
+      "Booking ID: " + booking.id +
+      "\nDate: " + booking.booking_date +
+      "\nTime: " + booking.booking_time +
+      "\nService: " + booking.service_requested +
+      "\nStatus: " + booking.status +
+      "\nCustomer ID: " + booking.customer_id +
+      "\nBike ID: " + booking.bike_id +
+      "\nNotes: " + (booking.customer_notes || "None");
+
+    details.style.whiteSpace = "pre-line";
+    card.appendChild(details);
+
+    if(booking.status === "pending") {
+      const approve = document.createElement("button");
+      approve.textContent = "APPROVE";
+      approve.onclick = () => updateBooking(booking.id,"approved");
+
+      const reject = document.createElement("button");
+      reject.textContent = "REJECT";
+      reject.className = "reject";
+      reject.onclick = () => updateBooking(booking.id,"rejected");
+
+      card.append(approve,reject);
+    }
+
+    area.appendChild(card);
+  });
+}
+
+async function updateBooking(id,status) {
+  if(!confirm("Change booking status to " + status + "?")) return;
+
+  const {error} = await db
+    .from("bookings")
+    .update({status})
+    .eq("id",id);
+
+  if(error) {
+    showMessage("Update failed: " + error.message);
+    return;
+  }
+
+  showMessage("Booking updated successfully.");
+  await loadBookings();
+}
+
+async function logout() {
+  await db.auth.signOut();
+  currentUser = null;
+  dashboard.classList.add("hidden");
+  loginBox.classList.remove("hidden");
+  showMessage("Logged out.");
+}
+
+async function start() {
+  const {data} = await db.auth.getSession();
+
+  if(data.session) {
+    await checkOwner(data.session.user);
+  }
+}
+
+start();
+</script>
+
+</body>
+</html>
