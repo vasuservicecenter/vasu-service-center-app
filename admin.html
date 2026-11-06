@@ -66,6 +66,22 @@ button{padding:12px 17px;border:0;border-radius:5px;background:var(--yellow);fon
 
   <div id="bookings">Loading bookings...</div>
 </div>
+  <div class="card">
+  <h2>👥 Customer Management</h2>
+
+  <input
+    id="customerSearch"
+    type="text"
+    placeholder="Search customer by name or mobile..."
+    oninput="loadCustomers()"
+  >
+
+  <button onclick="loadCustomers()">VIEW CUSTOMERS</button>
+
+  <div id="customers">
+    Tap VIEW CUSTOMERS to load customers.
+  </div>
+</div>
 </div>
 
 <p id="message"></p>
@@ -150,7 +166,52 @@ if(data.is_active!==true || !["owner","staff"].includes(data.role)){
   await loadBookings();
 }
 
-async function loadBookings(){
+async function loadCustomers() {
+  const area = document.getElementById("customers");
+  const search = document.getElementById("customerSearch").value.trim();
+
+  area.textContent = "Loading customers...";
+
+  let query = db
+    .from("customers")
+    .select("id, full_name, mobile")
+    .order("full_name");
+
+  if (search) {
+    query = query.or(
+      "full_name.ilike.%" + search + "%,mobile.ilike.%" + search + "%"
+    );
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    area.textContent = "Could not load customers: " + error.message;
+    return;
+  }
+
+  area.replaceChildren();
+
+  if (!data || data.length === 0) {
+    area.textContent = "No customers found.";
+    return;
+  }
+
+  data.forEach(customer => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.textContent =
+      "Name: " + customer.full_name +
+      "\nMobile: " + customer.mobile;
+
+    details.style.whiteSpace = "pre-line";
+    card.appendChild(details);
+    area.appendChild(card);
+  });
+}
+  async function loadBookings(){
   const area = document.getElementById("bookings");
   area.textContent = "Loading bookings...";
 
