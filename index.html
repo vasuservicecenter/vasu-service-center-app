@@ -120,11 +120,11 @@ document.getElementById("bookingForm").addEventListener("submit", async (e) => {
   const mobile = document.getElementById("mobile").value.replace(/\D/g,"");
 
   if (!/^[6-9]\d{9}$/.test(mobile)) {
-    message.textContent = "Please enter a valid 10-digit Indian mobile number.";
+    message.textContent = "+917207682656";
     return;
   }
 
-  if (SUPABASE_KEY === "PASTE_YOUR_PUBLISHABLE_KEY_HERE") {
+  if (SUPABASE_KEY === "sb_publishable_5kUQeT67fcXErDy8vCyHug_yvJDnMl9") {
     message.textContent = "Website setup is not finished yet. Please try again later.";
     return;
   }
