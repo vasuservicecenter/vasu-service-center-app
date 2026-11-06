@@ -333,6 +333,155 @@ async function loadCustomers() {
   close.onclick = () => profile.remove();
   profile.appendChild(close);
 }
+  async function showJobForm() {
+  const form = document.getElementById("jobForm");
+  form.classList.remove("hidden");
+
+  const customerSelect = document.getElementById("jobCustomer");
+  customerSelect.innerHTML = '<option value="">Loading customers...</option>';
+
+  const { data, error } = await db
+    .from("customers")
+    .select("id, full_name, mobile")
+    .order("full_name");
+
+  if (error) {
+    showMessage("Customer loading failed: " + error.message);
+    return;
+  }
+
+  customerSelect.innerHTML = '<option value="">Select Customer</option>';
+
+  data.forEach(customer => {
+    const option = document.createElement("option");
+    option.value = customer.id;
+    option.textContent = customer.full_name + " - " + customer.mobile;
+    customerSelect.appendChild(option);
+  });
+}
+
+document.getElementById("jobCustomer").addEventListener("change", async function() {
+  const bikeSelect = document.getElementById("jobBike");
+  bikeSelect.innerHTML = '<option value="">Loading bikes...</option>';
+
+  if (!this.value) {
+    bikeSelect.innerHTML = '<option value="">Select Bike</option>';
+    return;
+  }
+
+  const { data, error } = await db
+    .from("bikes")
+    .select("id, brand, model, registration_number")
+    .eq("customer_id", this.value);
+
+  if (error) {
+    showMessage("Bike loading failed: " + error.message);
+    return;
+  }
+
+  bikeSelect.innerHTML = '<option value="">Select Bike</option>';
+
+  data.forEach(bike => {
+    const option = document.createElement("option");
+    option.value = bike.id;
+    option.textContent =
+      bike.brand + " " + bike.model + " - " + bike.registration_number;
+    bikeSelect.appendChild(option);
+  });
+});
+
+async function saveJobCard() {
+  const customerId = document.getElementById("jobCustomer").value;
+  const bikeId = document.getElementById("jobBike").value;
+
+  if (!customerId || !bikeId) {
+    showMessage("Please select a customer and bike.");
+    return;
+  }
+
+  const labour = Number(document.getElementById("jobLabour").value || 0);
+  const discount = Number(document.getElementById("jobDiscount").value || 0);
+
+  if (labour < 0 || discount < 0 || discount > labour) {
+    showMessage("Please check labour and discount amounts.");
+    return;
+  }
+
+  const jobNumber = "VSC-" + Date.now();
+
+  const jobData = {
+    job_number: jobNumber,
+    customer_id: customerId,
+    bike_id: bikeId,
+    odometer: document.getElementById("jobOdometer").value
+      ? Number(document.getElementById("jobOdometer").value)
+      : null,
+    customer_complaint: document.getElementById("jobComplaint").value.trim(),
+    mechanic_observations: document.getElementById("jobObservation").value.trim(),
+    work_performed: document.getElementById("jobWork").value.trim(),
+    mechanic_name: document.getElementById("jobMechanic").value.trim(),
+    labour_charge: labour,
+    discount: discount,
+    subtotal: labour,
+    total_amount: labour - discount,
+    status: "received",
+    payment_status: "unpaid"
+  };
+
+  const { error } = await db
+    .from("job_cards")
+    .insert(jobData);
+
+  if (error) {
+    showMessage("Job card failed: " + error.message);
+    return;
+  }
+
+  showMessage("Job card created! Number: " + jobNumber);
+
+  document.getElementById("jobForm").reset();
+  document.getElementById("jobForm").classList.add("hidden");
+
+  await loadJobCards();
+}
+
+async function loadJobCards() {
+  const area = document.getElementById("jobCards");
+  area.textContent = "Loading job cards...";
+
+  const { data, error } = await db
+    .from("job_cards")
+    .select("job_number, customer_id, bike_id, status, total_amount, payment_status, received_at")
+    .order("received_at", { ascending: false });
+
+  if (error) {
+    area.textContent = "Could not load job cards: " + error.message;
+    return;
+  }
+
+  area.replaceChildren();
+
+  if (!data || data.length === 0) {
+    area.textContent = "No job cards created yet.";
+    return;
+  }
+
+  data.forEach(job => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.textContent =
+      "Job Number: " + job.job_number +
+      "\nStatus: " + job.status +
+      "\nTotal: ₹" + job.total_amount +
+      "\nPayment: " + job.payment_status;
+
+    details.style.whiteSpace = "pre-line";
+    card.appendChild(details);
+    area.appendChild(card);
+  });
+}
   async function loadBookings(){
   const area = document.getElementById("bookings");
   area.textContent = "Loading bookings...";
