@@ -142,20 +142,28 @@ async function loadBookings(){
   const area = document.getElementById("bookings");
   area.textContent = "Loading bookings...";
 
-  const {data, error} = await db
-    .from("bookings")
-    .select(`
-      id,
-      booking_date,
-      booking_time,
-      service_requested,
-      status,
-      customer_notes,
-      created_at,
-      customers(full_name, mobile),
-      bikes(registration_number, brand, model)
-    `)
-    .order("created_at", {ascending:false});
+  let query = db
+  .from("bookings")
+  .select(`
+    id,
+    booking_date,
+    booking_time,
+    service_requested,
+    status,
+    customer_notes,
+    created_at,
+    customers(full_name, mobile),
+    bikes(registration_number, brand, model)
+  `)
+  .order("created_at", {ascending:false});
+
+const filter = document.getElementById("statusFilter").value;
+
+if(filter !== "all"){
+  query = query.eq("status", filter);
+}
+
+const {data, error} = await query;
 
   if(error){
     area.textContent = "Could not load bookings: " + error.message;
@@ -199,17 +207,25 @@ async function loadBookings(){
     card.appendChild(details);
 
     if(booking.status === "pending"){
-      const approve = document.createElement("button");
-      approve.textContent = "APPROVE";
-      approve.onclick = () => updateBooking(booking.id, "approved");
+  const approve = document.createElement("button");
+  approve.textContent = "APPROVE";
+  approve.onclick = () => updateBooking(booking.id, "approved");
 
-      const reject = document.createElement("button");
-      reject.textContent = "REJECT";
-      reject.className = "reject";
-      reject.onclick = () => updateBooking(booking.id, "rejected");
+  const reject = document.createElement("button");
+  reject.textContent = "REJECT";
+  reject.className = "reject";
+  reject.onclick = () => updateBooking(booking.id, "rejected");
 
-      card.append(approve, reject);
-    }
+  card.append(approve, reject);
+}
+
+if(booking.status === "approved"){
+  const complete = document.createElement("button");
+  complete.textContent = "MARK COMPLETED";
+  complete.onclick = () => updateBooking(booking.id, "completed");
+
+  card.appendChild(complete);
+}
 
     area.appendChild(card);
   });
