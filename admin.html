@@ -198,18 +198,109 @@ async function loadCustomers() {
   }
 
   data.forEach(customer => {
-    const card = document.createElement("div");
-    card.className = "card";
+  const card = document.createElement("div");
+  card.className = "card";
 
-    const details = document.createElement("p");
-    details.textContent =
-      "Name: " + customer.full_name +
-      "\nMobile: " + customer.mobile;
+  const details = document.createElement("p");
+  details.textContent =
+    "Name: " + customer.full_name +
+    "\nMobile: " + customer.mobile;
 
-    details.style.whiteSpace = "pre-line";
-    card.appendChild(details);
-    area.appendChild(card);
-  });
+  details.style.whiteSpace = "pre-line";
+  card.appendChild(details);
+
+  const viewButton = document.createElement("button");
+  viewButton.textContent = "VIEW CUSTOMER PROFILE";
+  viewButton.onclick = () => viewCustomer(customer.id);
+
+  card.appendChild(viewButton);
+  area.appendChild(card);
+});
+}
+  async function viewCustomer(customerId) {
+  const area = document.getElementById("customers");
+
+  const profile = document.createElement("div");
+  profile.className = "card";
+  profile.textContent = "Loading customer profile...";
+
+  area.appendChild(profile);
+
+  const [customerResult, bikeResult, bookingResult] =
+    await Promise.all([
+      db.from("customers")
+        .select("full_name,mobile")
+        .eq("id", customerId)
+        .single(),
+
+      db.from("bikes")
+        .select("brand,model,registration_number")
+        .eq("customer_id", customerId),
+
+      db.from("bookings")
+        .select("booking_date,booking_time,service_requested,status")
+        .eq("customer_id", customerId)
+        .order("booking_date", {ascending:false})
+    ]);
+
+  if (customerResult.error || bikeResult.error || bookingResult.error) {
+    profile.textContent = "Could not load profile. Please check permissions.";
+    return;
+  }
+
+  const customer = customerResult.data;
+  const bikes = bikeResult.data || [];
+  const bookings = bookingResult.data || [];
+
+  profile.replaceChildren();
+
+  const title = document.createElement("h3");
+  title.textContent = "CUSTOMER PROFILE";
+  profile.appendChild(title);
+
+  const details = document.createElement("p");
+  details.textContent =
+    "Name: " + customer.full_name +
+    "\nMobile: " + customer.mobile;
+
+  details.style.whiteSpace = "pre-line";
+  profile.appendChild(details);
+
+  const bikeTitle = document.createElement("h3");
+  bikeTitle.textContent = "🏍️ REGISTERED BIKES";
+  profile.appendChild(bikeTitle);
+
+  const bikeDetails = document.createElement("p");
+  bikeDetails.textContent = bikes.length
+    ? bikes.map(b =>
+        b.brand + " " + b.model +
+        "\nRegistration: " + b.registration_number
+      ).join("\n\n")
+    : "No bikes registered.";
+
+  bikeDetails.style.whiteSpace = "pre-line";
+  profile.appendChild(bikeDetails);
+
+  const historyTitle = document.createElement("h3");
+  historyTitle.textContent = "📋 BOOKING HISTORY";
+  profile.appendChild(historyTitle);
+
+  const history = document.createElement("p");
+  history.textContent = bookings.length
+    ? bookings.map(b =>
+        b.booking_date + " | " + b.booking_time +
+        "\nService: " + b.service_requested +
+        "\nStatus: " + b.status.toUpperCase()
+      ).join("\n\n")
+    : "No booking history.";
+
+  history.style.whiteSpace = "pre-line";
+  profile.appendChild(history);
+
+  const close = document.createElement("button");
+  close.textContent = "CLOSE PROFILE";
+  close.onclick = () => profile.remove();
+  profile.appendChild(close);
 }
   async function loadBookings(){
   const area = document.getElementById("bookings");
