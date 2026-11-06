@@ -232,6 +232,42 @@ const {data, error} = await query;
 }
 
 if(booking.status === "approved"){
+
+  // WhatsApp confirmation button
+  const whatsapp = document.createElement("button");
+  whatsapp.textContent = "SEND WHATSAPP CONFIRMATION";
+
+  whatsapp.onclick = () => {
+    const phone = (customer.mobile || "").replace(/\D/g, "");
+
+    if(!phone){
+      alert("Customer mobile number not available.");
+      return;
+    }
+
+    const whatsappNumber =
+      phone.length === 10 ? "91" + phone : phone;
+
+    const bookingMessage =
+      "Hello " + (customer.full_name || "Customer") + "!\n\n" +
+      "Your booking at VASU SERVICE CENTER has been APPROVED! ✅\n\n" +
+      "🏍️ Bike: " + (bike.brand || "") + " " + (bike.model || "") + "\n" +
+      "Registration: " + (bike.registration_number || "") + "\n" +
+      "Service: " + booking.service_requested + "\n" +
+      "Date: " + booking.booking_date + "\n" +
+      "Time: " + booking.booking_time + "\n\n" +
+      "Thank you for choosing Vasu Service Center!";
+
+    const whatsappURL =
+      "https://wa.me/" + whatsappNumber +
+      "?text=" + encodeURIComponent(bookingMessage);
+
+    window.open(whatsappURL, "_blank");
+  };
+
+  card.appendChild(whatsapp);
+
+  // Mark completed button
   const complete = document.createElement("button");
   complete.textContent = "MARK COMPLETED";
   complete.onclick = () => updateBooking(booking.id, "completed");
