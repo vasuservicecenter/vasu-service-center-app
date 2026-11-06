@@ -82,6 +82,37 @@ button{padding:12px 17px;border:0;border-radius:5px;background:var(--yellow);fon
     Tap VIEW CUSTOMERS to load customers.
   </div>
 </div>
+  <div class="card">
+  <h2>🔧 Digital Job Cards</h2>
+
+  <button onclick="loadJobCards()">VIEW JOB CARDS</button>
+  <button onclick="showJobForm()">+ CREATE JOB CARD</button>
+
+  <div id="jobForm" class="hidden">
+    <h3>New Job Card</h3>
+
+    <select id="jobCustomer">
+      <option value="">Select Customer</option>
+    </select>
+
+    <select id="jobBike">
+      <option value="">Select Bike</option>
+    </select>
+
+    <input id="jobOdometer" type="number" placeholder="Odometer (optional)">
+    <input id="jobFuel" placeholder="Fuel level (optional)">
+    <textarea id="jobComplaint" placeholder="Customer complaints"></textarea>
+    <textarea id="jobObservation" placeholder="Mechanic observations"></textarea>
+    <textarea id="jobWork" placeholder="Work performed"></textarea>
+    <input id="jobMechanic" placeholder="Mechanic name">
+    <input id="jobLabour" type="number" placeholder="Labour charges">
+    <input id="jobDiscount" type="number" placeholder="Discount" value="0">
+
+    <button onclick="saveJobCard()">SAVE JOB CARD</button>
+  </div>
+
+  <div id="jobCards">No job cards loaded.</div>
+</div>
 </div>
 
 <p id="message"></p>
