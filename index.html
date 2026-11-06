@@ -153,10 +153,32 @@ document.getElementById("bookingForm").addEventListener("submit", async (e) => {
     console.error(error);
     message.textContent = "Error: " + error.message;
   } else {
-    message.textContent = "Booking request submitted! Please wait for workshop confirmation.";
-    e.target.reset();
-  }
-});
+  message.textContent = "Booking request submitted successfully!";
+
+  const bookingText =
+    "NEW BOOKING - VASU SERVICE CENTER\n\n" +
+    "Customer: " + document.getElementById("name").value.trim() + "\n" +
+    "Mobile: " + mobile + "\n" +
+    "Bike: " + document.getElementById("brand").value.trim() + " " +
+    document.getElementById("model").value.trim() + "\n" +
+    "Registration: " + document.getElementById("registration").value.trim() + "\n" +
+    "Service: " + document.getElementById("service").value + "\n" +
+    "Date: " + document.getElementById("date").value + "\n" +
+    "Time: " + document.getElementById("time").value + "\n" +
+    "Notes: " + document.getElementById("notes").value.trim();
+
+  const whatsappLink = document.createElement("a");
+  whatsappLink.href =
+    "https://wa.me/917207682656?text=" + encodeURIComponent(bookingText);
+  whatsappLink.target = "_blank";
+  whatsappLink.className = "btn";
+  whatsappLink.textContent = "SEND BOOKING TO WHATSAPP";
+
+  message.appendChild(document.createElement("br"));
+  message.appendChild(whatsappLink);
+
+  e.target.reset();
+}
 </script>
 </body>
 </html>
