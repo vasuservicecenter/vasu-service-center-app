@@ -151,7 +151,7 @@ document.getElementById("bookingForm").addEventListener("submit", async (e) => {
 
   if (error) {
     console.error(error);
-    message.textContent = "Booking could not be submitted. Please contact the workshop.";
+    message.textContent = "Error: " + error.message;
   } else {
     message.textContent = "Booking request submitted! Please wait for workshop confirmation.";
     e.target.reset();
