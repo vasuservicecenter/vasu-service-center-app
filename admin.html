@@ -138,23 +138,33 @@ if(data.is_active!==true || !["owner","staff"].includes(data.role)){
   await loadBookings();
 }
 
-async function loadBookings() {
+async function loadBookings(){
   const area = document.getElementById("bookings");
   area.textContent = "Loading bookings...";
 
-  const {data,error} = await db
+  const {data, error} = await db
     .from("bookings")
-    .select("id,customer_id,bike_id,booking_date,booking_time,service_requested,status,customer_notes,created_at")
-    .order("created_at",{ascending:false});
+    .select(`
+      id,
+      booking_date,
+      booking_time,
+      service_requested,
+      status,
+      customer_notes,
+      created_at,
+      customers(full_name, mobile),
+      bikes(registration_number, brand, model)
+    `)
+    .order("created_at", {ascending:false});
 
-  if(error) {
+  if(error){
     area.textContent = "Could not load bookings: " + error.message;
     return;
   }
 
   area.replaceChildren();
 
-  if(!data || data.length === 0) {
+  if(!data || data.length === 0){
     area.textContent = "No bookings received yet.";
     return;
   }
@@ -163,31 +173,42 @@ async function loadBookings() {
     const card = document.createElement("div");
     card.className = "card";
 
+    const customer = booking.customers || {};
+    const bike = booking.bikes || {};
+
     const details = document.createElement("p");
+
     details.textContent =
-      "Booking ID: " + booking.id +
-      "\nDate: " + booking.booking_date +
-      "\nTime: " + booking.booking_time +
-      "\nService: " + booking.service_requested +
-      "\nStatus: " + booking.status +
-      "\nCustomer ID: " + booking.customer_id +
-      "\nBike ID: " + booking.bike_id +
-      "\nNotes: " + (booking.customer_notes || "None");
+      "CUSTOMER DETAILS\n" +
+      "Name: " + (customer.full_name || "Not available") + "\n" +
+      "Mobile: " + (customer.mobile || "Not available") + "\n\n" +
+
+      "BIKE DETAILS\n" +
+      "Brand: " + (bike.brand || "Not available") + "\n" +
+      "Model: " + (bike.model || "Not available") + "\n" +
+      "Registration: " + (bike.registration_number || "Not available") + "\n\n" +
+
+      "BOOKING DETAILS\n" +
+      "Service: " + booking.service_requested + "\n" +
+      "Date: " + booking.booking_date + "\n" +
+      "Time: " + booking.booking_time + "\n" +
+      "Status: " + booking.status.toUpperCase() + "\n" +
+      "Notes: " + (booking.customer_notes || "None");
 
     details.style.whiteSpace = "pre-line";
     card.appendChild(details);
 
-    if(booking.status === "pending") {
+    if(booking.status === "pending"){
       const approve = document.createElement("button");
       approve.textContent = "APPROVE";
-      approve.onclick = () => updateBooking(booking.id,"approved");
+      approve.onclick = () => updateBooking(booking.id, "approved");
 
       const reject = document.createElement("button");
       reject.textContent = "REJECT";
       reject.className = "reject";
-      reject.onclick = () => updateBooking(booking.id,"rejected");
+      reject.onclick = () => updateBooking(booking.id, "rejected");
 
-      card.append(approve,reject);
+      card.append(approve, reject);
     }
 
     area.appendChild(card);
