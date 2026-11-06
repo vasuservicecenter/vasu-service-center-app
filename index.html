@@ -124,7 +124,7 @@ document.getElementById("bookingForm").addEventListener("submit", async (e) => {
     return;
   }
 
-  if (SUPABASE_KEY === "sb_publishable_5kUQeT67fcXErDy8vCyHug_yvJDnMl9") {
+  if (!SUPABASE_KEY || SUPABASE_KEY === "sb_publishable_5kUQeT67fcXErDy8vCyHug_yvJDnMl9") {
     message.textContent = "Website setup is not finished yet. Please try again later.";
     return;
   }
