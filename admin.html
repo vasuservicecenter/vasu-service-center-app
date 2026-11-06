@@ -112,13 +112,20 @@ async function checkOwner(user) {
     .eq("id",user.id)
     .maybeSingle();
 
-  if(error || !data || data.is_active !== true ||
-     !["owner","staff"].includes(data.role)) {
-
-    await db.auth.signOut();
-    showMessage("Access denied. Active workshop account required.");
+  if(error){
+    showMessage("Account check error: " + error.message);
     return;
-  }
+}
+
+if(!data){
+    showMessage("No admin account found for this login.");
+    return;
+}
+
+if(data.is_active!==true || !["owner","staff"].includes(data.role)){
+    showMessage("Account inactive or role not authorised.");
+    return;
+}
 
   currentUser = user;
 
