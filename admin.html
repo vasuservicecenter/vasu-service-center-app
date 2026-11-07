@@ -112,6 +112,32 @@ button{padding:12px 17px;border:0;border-radius:5px;background:var(--yellow);fon
   </div>
 
   <div id="jobCards">No job cards loaded.</div>
+    <div class="card">
+  <h3>💰 Record Payment</h3>
+
+  <select id="paymentJobCard">
+    <option value="">Select Job Card</option>
+  </select>
+
+  <p id="paymentSummary">Select a job card to see its balance.</p>
+
+  <input id="paymentAmount" type="number" min="0.01" step="0.01" placeholder="Amount received (₹)">
+
+  <select id="paymentMethod">
+    <option value="">Payment method</option>
+    <option value="cash">Cash</option>
+    <option value="upi">UPI</option>
+    <option value="card">Card</option>
+  </select>
+
+  <input id="paymentReference" placeholder="Transaction reference (optional)">
+
+  <textarea id="paymentNotes" placeholder="Payment notes (optional)"></textarea>
+
+  <button onclick="recordPayment()">RECORD PAYMENT</button>
+
+  <div id="paymentHistory"></div>
+</div>
 </div>
 </div>
 
@@ -482,6 +508,177 @@ async function loadJobCards() {
     area.appendChild(card);
   });
 }
+  // LOAD JOB CARDS INTO PAYMENT DROPDOWN
+async function loadPaymentJobCards() {
+  const select = document.getElementById("paymentJobCard");
+
+  select.innerHTML = '<option value="">Select Job Card</option>';
+
+  const { data, error } = await db
+    .from("job_cards")
+    .select("id, job_number, total_amount")
+    .order("received_at", { ascending: false });
+
+  if (error) {
+    document.getElementById("paymentSummary").textContent =
+      "Could not load job cards: " + error.message;
+    return;
+  }
+
+  data.forEach(job => {
+    const option = document.createElement("option");
+    option.value = job.id;
+    option.textContent = "Job #" + job.job_number;
+    select.appendChild(option);
+  });
+}
+
+// SHOW PAYMENT SUMMARY AND HISTORY
+async function loadPaymentDetails(jobId) {
+  const summary = document.getElementById("paymentSummary");
+  const history = document.getElementById("paymentHistory");
+
+  if (!jobId) {
+    summary.textContent = "Select a job card to see its balance.";
+    history.replaceChildren();
+    return;
+  }
+
+  const { data: job, error: jobError } = await db
+    .from("job_cards")
+    .select("total_amount")
+    .eq("id", jobId)
+    .single();
+
+  if (jobError) {
+    summary.textContent = jobError.message;
+    return;
+  }
+
+  const { data: payments, error } = await db
+    .from("payments")
+    .select("amount, payment_method, payment_date, transaction_reference, notes")
+    .eq("job_card_id", jobId)
+    .order("payment_date", { ascending: false });
+
+  if (error) {
+    summary.textContent = "Could not load payments: " + error.message;
+    return;
+  }
+
+  const paid = payments.reduce(
+    (sum, payment) => sum + Number(payment.amount), 0
+  );
+
+  const total = Number(job.total_amount || 0);
+  const balance = total - paid;
+
+  summary.textContent =
+    "Total: ₹" + total.toFixed(2) +
+    " | Paid: ₹" + paid.toFixed(2) +
+    " | Balance: ₹" + balance.toFixed(2);
+
+  history.replaceChildren();
+
+  const heading = document.createElement("h4");
+  heading.textContent = "Payment History";
+  history.appendChild(heading);
+
+  if (payments.length === 0) {
+    history.append("No payments recorded yet.");
+    return;
+  }
+
+  payments.forEach(payment => {
+    const item = document.createElement("p");
+    item.textContent =
+      "₹" + Number(payment.amount).toFixed(2) +
+      " - " + payment.payment_method.toUpperCase() +
+      " - " + new Date(payment.payment_date).toLocaleString() +
+      (payment.transaction_reference
+        ? " - Ref: " + payment.transaction_reference
+        : "");
+    history.appendChild(item);
+  });
+}
+
+// RECORD PAYMENT
+async function recordPayment() {
+  const jobId = document.getElementById("paymentJobCard").value;
+  const amount = Number(document.getElementById("paymentAmount").value);
+  const method = document.getElementById("paymentMethod").value;
+
+  if (!jobId) {
+    alert("Please select a job card.");
+    return;
+  }
+
+  if (!amount || amount <= 0) {
+    alert("Enter a valid payment amount.");
+    return;
+  }
+
+  if (!method) {
+    alert("Please select a payment method.");
+    return;
+  }
+
+  const button = document.querySelector(
+    'button[onclick="recordPayment()"]'
+  );
+
+  button.disabled = true;
+  button.textContent = "RECORDING...";
+
+  const { data, error } = await db.rpc("record_job_payment", {
+    p_job_card_id: jobId,
+    p_amount: amount,
+    p_payment_method: method,
+    p_transaction_reference:
+      document.getElementById("paymentReference").value.trim() || null,
+    p_notes:
+      document.getElementById("paymentNotes").value.trim() || null
+  });
+
+  button.disabled = false;
+  button.textContent = "RECORD PAYMENT";
+
+  if (error) {
+    alert("Payment failed: " + error.message);
+    return;
+  }
+
+  const result = Array.isArray(data) ? data[0] : data;
+
+  alert(
+    "Payment recorded successfully!\n" +
+    "Total paid: ₹" + Number(result.paid_amount).toFixed(2) +
+    "\nRemaining balance: ₹" +
+    Number(result.balance_amount).toFixed(2) +
+    "\nStatus: " + result.new_payment_status
+  );
+
+  document.getElementById("paymentAmount").value = "";
+  document.getElementById("paymentMethod").value = "";
+  document.getElementById("paymentReference").value = "";
+  document.getElementById("paymentNotes").value = "";
+
+  await loadPaymentDetails(jobId);
+  await loadJobCards();
+}
+
+// PAYMENT DROPDOWN EVENTS
+document.getElementById("paymentJobCard").addEventListener(
+  "focus",
+  loadPaymentJobCards
+);
+
+document.getElementById("paymentJobCard").addEventListener(
+  "change",
+  function () {
+    loadPaymentDetails(this.value);
+  }
+);
   async function loadBookings(){
   const area = document.getElementById("bookings");
   area.textContent = "Loading bookings...";
