@@ -798,7 +798,7 @@ stockOut.textContent = "STOCK OUT";
 stockOut.className = "secondary";
 stockOut.onclick = () => {
   const type = prompt("Enter 'sale' for sold or 'used' for workshop use:");
-  if (type === "sale" || type === "used") {
+  if (type && ["sale", "used"].includes(type.trim().toLowerCase())) {
     changeStock(product.id, type);
   }
 };
