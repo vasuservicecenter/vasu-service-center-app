@@ -887,6 +887,62 @@ async function saveProduct() {
   alert("Stock updated successfully!");
   await loadProducts();
 }
+  async function loadInventoryHistory() {
+  const area = document.getElementById("inventoryHistory");
+  area.textContent = "Loading inventory history...";
+
+  const { data, error } = await db
+    .from("inventory_movements")
+    .select("id, product_id, movement_type, quantity, reference, notes, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    area.textContent = "Could not load history: " + error.message;
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    area.textContent = "No inventory history yet.";
+    return;
+  }
+
+  const { data: products, error: productError } = await db
+    .from("products")
+    .select("id, product_name, brand");
+
+  if (productError) {
+    area.textContent = "Could not load product names: " + productError.message;
+    return;
+  }
+
+  const productMap = {};
+  products.forEach(p => {
+    productMap[p.id] = p;
+  });
+
+  area.replaceChildren();
+
+  data.forEach(item => {
+    const product = productMap[item.product_id];
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.style.whiteSpace = "pre-line";
+
+    details.textContent =
+      "Product: " + (product ? product.product_name : "Unknown") +
+      "\nBrand: " + (product?.brand || "-") +
+      "\nMovement: " + item.movement_type +
+      "\nQuantity: " + item.quantity +
+      "\nDate: " + new Date(item.created_at).toLocaleString("en-IN") +
+      "\nReference: " + (item.reference || "-") +
+      "\nNotes: " + (item.notes || "-");
+
+    card.appendChild(details);
+    area.appendChild(card);
+  });
+}
   async function loadBookings(){
   const area = document.getElementById("bookings");
   area.textContent = "Loading bookings...";
