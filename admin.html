@@ -716,9 +716,83 @@ async function loadJobCards() {
       "\nFINAL TOTAL: ₹" + Number(job.total_amount || 0).toFixed(2) +
       "\nPayment: " + job.payment_status.toUpperCase();
 
-    card.appendChild(totalDetails);
+        card.appendChild(totalDetails);
+
+    const statusTitle = document.createElement("h4");
+    statusTitle.textContent = "🔄 UPDATE JOB STATUS";
+    card.appendChild(statusTitle);
+
+    const statusSelect = document.createElement("select");
+    statusSelect.style.width = "100%";
+    statusSelect.style.padding = "12px";
+    statusSelect.style.margin = "8px 0";
+    statusSelect.style.background = "#101010";
+    statusSelect.style.color = "white";
+
+    const statuses = [
+      ["received", "Received"],
+      ["inspection", "Under Inspection"],
+      ["waiting_parts", "Waiting for Parts"],
+      ["in_service", "In Progress"],
+      ["completed", "Completed"],
+      ["delivered", "Delivered"]
+    ];
+
+    statuses.forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      statusSelect.appendChild(option);
+    });
+
+    statusSelect.value = job.status;
+
+    const updateButton = document.createElement("button");
+    updateButton.textContent = "UPDATE STATUS";
+
+    updateButton.onclick = () => {
+      updateJobStatus(job.id, statusSelect.value);
+    };
+
+    card.appendChild(statusSelect);
+    card.appendChild(updateButton);
+
     area.appendChild(card);
   });
+}
+  async function updateJobStatus(jobId, newStatus) {
+
+  const allowedStatuses = [
+    "received",
+    "inspection",
+    "waiting_parts",
+    "in_service",
+    "completed",
+    "delivered"
+  ];
+
+  if (!allowedStatuses.includes(newStatus)) {
+    alert("Invalid job status.");
+    return;
+  }
+
+  if (!confirm("Change job status to " + newStatus + "?")) {
+    return;
+  }
+
+  const { error } = await db
+    .from("job_cards")
+    .update({ status: newStatus })
+    .eq("id", jobId);
+
+  if (error) {
+    alert("Status update failed: " + error.message);
+    return;
+  }
+
+  alert("Job status updated successfully!");
+
+  await loadJobCards();
 }
   // LOAD JOB CARDS INTO PAYMENT DROPDOWN
 async function loadPaymentJobCards() {
