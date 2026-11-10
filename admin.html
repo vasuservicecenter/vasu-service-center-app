@@ -107,7 +107,10 @@ button{padding:12px 17px;border:0;border-radius:5px;background:var(--yellow);fon
     <input id="jobMechanic" placeholder="Mechanic name">
     <input id="jobLabour" type="number" placeholder="Labour charges">
     <input id="jobDiscount" type="number" placeholder="Discount" value="0">
-
+    <input id="jobPartName" placeholder="Part name (optional)">
+<input id="jobPartBrand" placeholder="Part brand (optional)">
+<input id="jobPartQty" type="number" min="1" value="1" placeholder="Quantity">
+<input id="jobPartPrice" type="number" min="0" step="0.01" placeholder="Part price (₹)">
     <button onclick="saveJobCard()">SAVE JOB CARD</button>
   </div>
 
@@ -276,6 +279,7 @@ if(data.is_active!==true || !["owner","staff"].includes(data.role)){
   dashboard.classList.remove("hidden");
 
   await loadBookings();
+  await loadPaymentJobCards();
 }
 
 async function loadCustomers() {
@@ -483,11 +487,29 @@ async function saveJobCard() {
   const labour = Number(document.getElementById("jobLabour").value || 0);
   const discount = Number(document.getElementById("jobDiscount").value || 0);
 
+  const partName = document.getElementById("jobPartName").value.trim();
+  const partBrand = document.getElementById("jobPartBrand").value.trim();
+  const partQty = Number(document.getElementById("jobPartQty").value || 1);
+  const partPrice = Number(document.getElementById("jobPartPrice").value || 0);
+
   if (labour < 0 || discount < 0 || discount > labour) {
     showMessage("Please check labour and discount amounts.");
     return;
   }
 
+  if (partName && (partQty <= 0 || partPrice < 0)) {
+    showMessage("Please check part quantity and price.");
+    return;
+  }
+
+  if (!partName && (partBrand || partPrice > 0)) {
+    showMessage("Enter a part name or clear the part details.");
+    return;
+  }
+
+  const partTotal = partName ? partQty * partPrice : 0;
+  const subtotal = labour + partTotal;
+  const total = subtotal - discount;
 
   const jobData = {
     customer_id: customerId,
@@ -501,26 +523,58 @@ async function saveJobCard() {
     mechanic_name: document.getElementById("jobMechanic").value.trim(),
     labour_charge: labour,
     discount: discount,
-    subtotal: labour,
-    total_amount: labour - discount,
+    subtotal: subtotal,
+    total_amount: total,
     status: "received",
     payment_status: "unpaid"
   };
 
   const { data: savedJob, error } = await db
-  .from("job_cards")
-  .insert(jobData)
-  .select("job_number")
-  .single();
+    .from("job_cards")
+    .insert(jobData)
+    .select("id, job_number")
+    .single();
 
   if (error) {
     showMessage("Job card failed: " + error.message);
     return;
   }
 
+  if (partName) {
+    const { error: itemError } = await db
+      .from("job_card_items")
+      .insert({
+        job_card_id: savedJob.id,
+        item_name: partName,
+        brand: partBrand || null,
+        quantity: partQty,
+        unit_price: partPrice,
+        total_price: partTotal,
+        item_type: "part"
+      });
+
+    if (itemError) {
+      await db.from("job_cards")
+        .update({
+          subtotal: labour,
+          total_amount: labour - discount
+        })
+        .eq("id", savedJob.id);
+
+      showMessage(
+        "Job card created, but part could not be saved: " +
+        itemError.message
+      );
+      await loadJobCards();
+      return;
+    }
+  }
+
   showMessage("Job card created! Number: " + savedJob.job_number);
 
   document.getElementById("jobForm").reset();
+  document.getElementById("jobDiscount").value = "0";
+  document.getElementById("jobPartQty").value = "1";
   document.getElementById("jobForm").classList.add("hidden");
 
   await loadJobCards();
