@@ -781,7 +781,31 @@ async function loadProducts() {
       "\nMinimum Stock: " + product.minimum_stock;
 
     card.appendChild(details);
-    area.appendChild(card);
+
+if (Number(product.stock_quantity) <= Number(product.minimum_stock)) {
+  const warning = document.createElement("p");
+  warning.textContent = "⚠️ LOW STOCK";
+  warning.style.color = "#ffd400";
+  card.appendChild(warning);
+}
+
+const stockIn = document.createElement("button");
+stockIn.textContent = "STOCK IN";
+stockIn.onclick = () => changeStock(product.id, "purchase");
+
+const stockOut = document.createElement("button");
+stockOut.textContent = "STOCK OUT";
+stockOut.className = "secondary";
+stockOut.onclick = () => {
+  const type = prompt("Enter 'sale' for sold or 'used' for workshop use:");
+  if (type === "sale" || type === "used") {
+    changeStock(product.id, type);
+  }
+};
+
+card.appendChild(stockIn);
+card.appendChild(stockOut);
+area.appendChild(card);
   });
 }
 
@@ -827,6 +851,29 @@ async function saveProduct() {
 
   document.querySelectorAll("#productForm input, #productForm select, #productForm textarea").forEach(field => field.value = "");
   hideProductForm();
+  await loadProducts();
+}
+
+  async function changeStock(productId, movementType) {
+  const quantity = Number(prompt("Enter quantity:"));
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    alert("Enter a valid quantity.");
+    return;
+  }
+
+  const { error } = await db.rpc("update_product_stock", {
+    p_product_id: productId,
+    p_quantity: quantity,
+    p_movement_type: movementType
+  });
+
+  if (error) {
+    alert("Stock update failed: " + error.message);
+    return;
+  }
+
+  alert("Stock updated successfully!");
   await loadProducts();
 }
   async function loadBookings(){
