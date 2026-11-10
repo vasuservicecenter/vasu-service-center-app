@@ -139,6 +139,50 @@ button{padding:12px 17px;border:0;border-radius:5px;background:var(--yellow);fon
   <div id="paymentHistory"></div>
 </div>
 </div>
+<div class="card">
+  <h2>📦 Inventory Management</h2>
+
+  <button onclick="loadProducts()">VIEW ALL PRODUCTS</button>
+  <button onclick="showProductForm()">+ ADD PRODUCT</button>
+
+  <input
+    id="productSearch"
+    placeholder="Search product, brand or code..."
+    oninput="loadProducts()"
+  >
+
+  <div id="productForm" class="hidden">
+    <h3>Product Details</h3>
+
+    <input id="productName" placeholder="Product name">
+    <input id="productBrand" placeholder="Brand">
+    
+    <select id="productCategory">
+      <option value="">Select category</option>
+      <option value="Engine Oil">Engine Oil</option>
+      <option value="Chain Cleaner">Chain Cleaner</option>
+      <option value="Chain Lube">Chain Lube</option>
+      <option value="Bike Care">Bike Care</option>
+      <option value="Additives">Additives</option>
+      <option value="Spare Parts">Spare Parts</option>
+      <option value="Accessories">Accessories</option>
+      <option value="Other">Other</option>
+    </select>
+
+    <input id="productCode" placeholder="Product code (optional)">
+    <input id="productPurchase" type="number" min="0" step="0.01" placeholder="Purchase price (₹)">
+    <input id="productSelling" type="number" min="0" step="0.01" placeholder="Selling price (₹)">
+    <input id="productStock" type="number" min="0" step="0.01" placeholder="Opening stock">
+    <input id="productMinimum" type="number" min="0" step="0.01" placeholder="Minimum stock" value="2">
+    <input id="productUnit" placeholder="Unit (piece, litre, bottle)">
+    <textarea id="productNotes" placeholder="Product notes"></textarea>
+
+    <button onclick="saveProduct()">SAVE PRODUCT</button>
+    <button class="secondary" onclick="hideProductForm()">CANCEL</button>
+  </div>
+
+  <div id="products">No products loaded.</div>
+</div>
 </div>
 
 <p id="message"></p>
@@ -679,6 +723,112 @@ document.getElementById("paymentJobCard").addEventListener(
     loadPaymentDetails(this.value);
   }
 );
+  // INVENTORY MANAGEMENT
+
+function showProductForm() {
+  document.getElementById("productForm").classList.remove("hidden");
+}
+
+function hideProductForm() {
+  document.getElementById("productForm").classList.add("hidden");
+}
+
+async function loadProducts() {
+  const area = document.getElementById("products");
+  const search = document.getElementById("productSearch").value.trim();
+
+  area.textContent = "Loading products...";
+
+  let query = db
+    .from("products")
+    .select("*")
+    .order("product_name");
+
+  if (search) {
+    query = query.or(
+      "product_name.ilike.%" + search +
+      "%,brand.ilike.%" + search +
+      "%,product_code.ilike.%" + search + "%"
+    );
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    area.textContent = "Could not load products: " + error.message;
+    return;
+  }
+
+  area.replaceChildren();
+
+  if (!data || data.length === 0) {
+    area.textContent = "No products found.";
+    return;
+  }
+
+  data.forEach(product => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.style.whiteSpace = "pre-line";
+    details.textContent =
+      product.product_name +
+      "\nBrand: " + (product.brand || "-") +
+      "\nCode: " + (product.product_code || "-") +
+      "\nStock: " + product.stock_quantity +
+      "\nSelling Price: ₹" + product.selling_price +
+      "\nMinimum Stock: " + product.minimum_stock;
+
+    card.appendChild(details);
+    area.appendChild(card);
+  });
+}
+
+async function saveProduct() {
+  const product = {
+    product_name: document.getElementById("productName").value.trim(),
+    brand: document.getElementById("productBrand").value.trim(),
+    category: document.getElementById("productCategory").value,
+    product_code: document.getElementById("productCode").value.trim(),
+    purchase_price: Number(document.getElementById("productPurchase").value || 0),
+    selling_price: Number(document.getElementById("productSelling").value || 0),
+    stock_quantity: Number(document.getElementById("productStock").value || 0),
+    minimum_stock: Number(document.getElementById("productMinimum").value || 2),
+    unit: document.getElementById("productUnit").value.trim(),
+    notes: document.getElementById("productNotes").value.trim()
+  };
+
+  if (!product.product_name || !product.category) {
+    alert("Enter product name and select a category.");
+    return;
+  }
+
+  if (
+    product.purchase_price < 0 ||
+    product.selling_price < 0 ||
+    product.stock_quantity < 0 ||
+    product.minimum_stock < 0
+  ) {
+    alert("Prices and stock quantities cannot be negative.");
+    return;
+  }
+
+  const { error } = await db
+    .from("products")
+    .insert(product);
+
+  if (error) {
+    alert("Could not save product: " + error.message);
+    return;
+  }
+
+  alert("Product added successfully!");
+
+  document.getElementById("productForm").reset();
+  hideProductForm();
+  await loadProducts();
+}
   async function loadBookings(){
   const area = document.getElementById("bookings");
   area.textContent = "Loading bookings...";
