@@ -584,9 +584,24 @@ async function loadJobCards() {
   const area = document.getElementById("jobCards");
   area.textContent = "Loading job cards...";
 
-  const { data, error } = await db
+  const { data: jobs, error } = await db
     .from("job_cards")
-    .select("job_number, customer_id, bike_id, status, total_amount, payment_status, received_at")
+    .select(`
+      id,
+      job_number,
+      customer_id,
+      bike_id,
+      status,
+      total_amount,
+      payment_status,
+      received_at,
+      labour_charge,
+      discount,
+      customer_complaint,
+      mechanic_observations,
+      work_performed,
+      mechanic_name
+    `)
     .order("received_at", { ascending: false });
 
   if (error) {
@@ -596,24 +611,112 @@ async function loadJobCards() {
 
   area.replaceChildren();
 
-  if (!data || data.length === 0) {
+  if (!jobs || jobs.length === 0) {
     area.textContent = "No job cards created yet.";
     return;
   }
 
-  data.forEach(job => {
+  const customerIds = [...new Set(jobs.map(j => j.customer_id))];
+  const bikeIds = [...new Set(jobs.map(j => j.bike_id))];
+  const jobIds = jobs.map(j => j.id);
+
+  const [customerResult, bikeResult, itemResult] = await Promise.all([
+    db.from("customers")
+      .select("id, full_name, mobile")
+      .in("id", customerIds),
+
+    db.from("bikes")
+      .select("id, brand, model, registration_number")
+      .in("id", bikeIds),
+
+    db.from("job_card_items")
+      .select("job_card_id, item_name, brand, quantity, unit_price, total_price, item_type")
+      .in("job_card_id", jobIds)
+  ]);
+
+  if (customerResult.error || bikeResult.error || itemResult.error) {
+    area.textContent =
+      "Could not load job details: " +
+      (customerResult.error || bikeResult.error || itemResult.error).message;
+    return;
+  }
+
+  const customers = {};
+  (customerResult.data || []).forEach(c => customers[c.id] = c);
+
+  const bikes = {};
+  (bikeResult.data || []).forEach(b => bikes[b.id] = b);
+
+  const items = {};
+  (itemResult.data || []).forEach(item => {
+    if (!items[item.job_card_id]) {
+      items[item.job_card_id] = [];
+    }
+    items[item.job_card_id].push(item);
+  });
+
+  jobs.forEach(job => {
+    const customer = customers[job.customer_id] || {};
+    const bike = bikes[job.bike_id] || {};
+    const parts = items[job.id] || [];
+
     const card = document.createElement("div");
     card.className = "card";
 
     const details = document.createElement("p");
-    details.textContent =
-      "Job Number: " + job.job_number +
-      "\nStatus: " + job.status +
-      "\nTotal: ₹" + job.total_amount +
-      "\nPayment: " + job.payment_status;
-
     details.style.whiteSpace = "pre-line";
+
+    details.textContent =
+      "JOB NUMBER: " + job.job_number +
+      "\nStatus: " + job.status.toUpperCase() +
+      "\n\nCUSTOMER DETAILS" +
+      "\nName: " + (customer.full_name || "-") +
+      "\nMobile: " + (customer.mobile || "-") +
+      "\n\nBIKE DETAILS" +
+      "\nBike: " + (bike.brand || "") + " " + (bike.model || "") +
+      "\nRegistration: " + (bike.registration_number || "-") +
+      "\n\nCUSTOMER COMPLAINT" +
+      "\n" + (job.customer_complaint || "-") +
+      "\n\nMECHANIC OBSERVATIONS" +
+      "\n" + (job.mechanic_observations || "-") +
+      "\n\nWORK PERFORMED" +
+      "\n" + (job.work_performed || "-") +
+      "\n\nMechanic: " + (job.mechanic_name || "-") +
+      "\n\nLABOUR: ₹" + Number(job.labour_charge || 0).toFixed(2);
+
     card.appendChild(details);
+
+    const partsHeading = document.createElement("h4");
+    partsHeading.textContent = "🔩 SPARE PARTS";
+    card.appendChild(partsHeading);
+
+    if (parts.length === 0) {
+      const noParts = document.createElement("p");
+      noParts.textContent = "No spare parts added.";
+      card.appendChild(noParts);
+    } else {
+      parts.forEach(part => {
+        const partDetails = document.createElement("p");
+        partDetails.textContent =
+          (part.item_name || "Item") +
+          " (" + (part.brand || "-") + ")" +
+          "\nQuantity: " + part.quantity +
+          "\nUnit price: ₹" + Number(part.unit_price || 0).toFixed(2) +
+          "\nTotal: ₹" + Number(part.total_price || 0).toFixed(2);
+
+        partDetails.style.whiteSpace = "pre-line";
+        card.appendChild(partDetails);
+      });
+    }
+
+    const totalDetails = document.createElement("p");
+    totalDetails.style.whiteSpace = "pre-line";
+    totalDetails.textContent =
+      "\nDiscount: ₹" + Number(job.discount || 0).toFixed(2) +
+      "\nFINAL TOTAL: ₹" + Number(job.total_amount || 0).toFixed(2) +
+      "\nPayment: " + job.payment_status.toUpperCase();
+
+    card.appendChild(totalDetails);
     area.appendChild(card);
   });
 }
