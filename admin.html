@@ -825,7 +825,7 @@ async function saveProduct() {
 
   alert("Product added successfully!");
 
-  document.getElementById("productForm").reset();
+  document.querySelectorAll("#productForm input, #productForm select, #productForm textarea").forEach(field => field.value = "");
   hideProductForm();
   await loadProducts();
 }
