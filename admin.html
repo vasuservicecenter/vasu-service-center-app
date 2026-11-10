@@ -572,9 +572,9 @@ async function saveJobCard() {
 
   showMessage("Job card created! Number: " + savedJob.job_number);
 
-  document.getElementById("jobForm").reset();
-  document.getElementById("jobDiscount").value = "0";
-  document.getElementById("jobPartQty").value = "1";
+  document.getElementById("jobForm").querySelectorAll("input, select, textarea").forEach(el => el.value = "");
+document.getElementById("jobDiscount").value = 0;
+document.getElementById("jobPartQty").value = 1;
   document.getElementById("jobForm").classList.add("hidden");
 
   await loadJobCards();
