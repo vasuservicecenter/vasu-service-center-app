@@ -1097,7 +1097,7 @@ async function loadPaymentDetails(jobId) {
 
   const { data: payments, error } = await db
     .from("payments")
-    .select("amount, payment_method, payment_date, transaction_reference, notes")
+    .select("id, amount, payment_method, payment_date, transaction_reference, notes")
     .eq("job_card_id", jobId)
     .order("payment_date", { ascending: false });
 
@@ -1130,18 +1130,266 @@ async function loadPaymentDetails(jobId) {
   }
 
   payments.forEach(payment => {
-    const item = document.createElement("p");
-    item.textContent =
-      "₹" + Number(payment.amount).toFixed(2) +
-      " - " + payment.payment_method.toUpperCase() +
-      " - " + new Date(payment.payment_date).toLocaleString() +
-      (payment.transaction_reference
-        ? " - Ref: " + payment.transaction_reference
-        : "");
-    history.appendChild(item);
-  });
-}
+  const paymentCard = document.createElement("div");
+  paymentCard.className = "card";
 
+  const item = document.createElement("p");
+  item.textContent =
+    "Amount: ₹" + Number(payment.amount).toFixed(2) +
+    "\nMethod: " + payment.payment_method.toUpperCase() +
+    "\nDate: " + new Date(payment.payment_date).toLocaleString() +
+    (payment.transaction_reference
+      ? "\nReference: " + payment.transaction_reference
+      : "");
+
+  item.style.whiteSpace = "pre-line";
+
+  const receiptButton = document.createElement("button");
+  receiptButton.textContent = "🧾 PRINT RECEIPT";
+  receiptButton.onclick = () =>
+    printPaymentReceipt(payment, jobId);
+
+  paymentCard.appendChild(item);
+  paymentCard.appendChild(receiptButton);
+  history.appendChild(paymentCard);
+});
+}
+async function printPaymentReceipt(payment, jobId) {
+
+  const printWindow = window.open("", "_blank");
+
+  if (!printWindow) {
+    alert("Please allow pop-ups to print receipts.");
+    return;
+  }
+
+  const [jobResult, paymentsResult] = await Promise.all([
+    db.from("job_cards")
+      .select("job_number, total_amount, customer_id, bike_id")
+      .eq("id", jobId)
+      .single(),
+
+    db.from("payments")
+      .select("id, amount, payment_date")
+      .eq("job_card_id", jobId)
+      .order("payment_date", { ascending: true })
+  ]);
+
+  if (jobResult.error || paymentsResult.error) {
+    printWindow.close();
+    alert("Could not load receipt details.");
+    return;
+  }
+
+  const job = jobResult.data;
+  const payments = paymentsResult.data || [];
+
+  const [customerResult, bikeResult] = await Promise.all([
+    db.from("customers")
+      .select("full_name, mobile")
+      .eq("id", job.customer_id)
+      .single(),
+
+    db.from("bikes")
+      .select("brand, model, registration_number")
+      .eq("id", job.bike_id)
+      .single()
+  ]);
+
+  if (customerResult.error || bikeResult.error) {
+    printWindow.close();
+    alert("Could not load customer or bike details.");
+    return;
+  }
+
+  const customer = customerResult.data;
+  const bike = bikeResult.data;
+
+  const paymentIndex = payments.findIndex(
+    p => p.id === payment.id
+  );
+
+  if (paymentIndex === -1) {
+    printWindow.close();
+    alert("Payment record not found.");
+    return;
+  }
+
+  const previousPaid = payments
+    .slice(0, paymentIndex)
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const amount = Number(payment.amount);
+  const total = Number(job.total_amount || 0);
+  const paidAfter = previousPaid + amount;
+  const balance = Math.max(0, total - paidAfter);
+
+  const escapeHTML = value =>
+    String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[char]);
+
+  const receiptNumber =
+    "VSC-" + String(payment.id).slice(0, 8).toUpperCase();
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Receipt ${receiptNumber}</title>
+
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          color: #222;
+          margin: 30px;
+        }
+
+        .header {
+          background: #101010;
+          color: white;
+          padding: 22px;
+          border-bottom: 6px solid #ffd400;
+        }
+
+        .header h1 {
+          margin: 0;
+        }
+
+        .yellow {
+          color: #ffd400;
+        }
+
+        .section {
+          margin-top: 25px;
+        }
+
+        .box {
+          border: 1px solid #ccc;
+          padding: 18px;
+          margin-top: 20px;
+        }
+
+        .amount {
+          font-size: 28px;
+          font-weight: bold;
+          text-align: center;
+          margin: 25px 0;
+        }
+
+        .row {
+          display: flex;
+          justify-content: space-between;
+          gap: 15px;
+          margin: 12px 0;
+        }
+
+        .footer {
+          text-align: center;
+          border-top: 1px solid #ccc;
+          padding-top: 20px;
+          margin-top: 40px;
+        }
+
+        @page {
+          size: A4;
+          margin: 12mm;
+        }
+
+        @media print {
+          body { margin: 0; }
+          .no-print { display: none; }
+        }
+      </style>
+    </head>
+
+    <body>
+
+      <div class="header">
+        <h1>VASU <span class="yellow">SERVICE CENTER</span></h1>
+        <p>Two-Wheeler Service & Care</p>
+      </div>
+
+      <div class="section">
+        <h2>PAYMENT RECEIPT</h2>
+        <p><b>Receipt No:</b> ${receiptNumber}</p>
+        <p><b>Date:</b> ${new Date(payment.payment_date).toLocaleString("en-IN")}</p>
+        <p><b>Job Number:</b> ${escapeHTML(job.job_number)}</p>
+      </div>
+
+      <div class="section">
+        <h3>Customer Details</h3>
+        <p>${escapeHTML(customer.full_name)}</p>
+        <p>Mobile: ${escapeHTML(customer.mobile)}</p>
+
+        <h3>Bike Details</h3>
+        <p>${escapeHTML(bike.brand)} ${escapeHTML(bike.model)}</p>
+        <p>Registration: ${escapeHTML(bike.registration_number)}</p>
+      </div>
+
+      <div class="box">
+        <h3>Payment Details</h3>
+
+        <div class="amount">
+          ₹${amount.toFixed(2)}
+        </div>
+
+        <div class="row">
+          <span>Payment Method:</span>
+          <b>${escapeHTML(payment.payment_method.toUpperCase())}</b>
+        </div>
+
+        <div class="row">
+          <span>Previous Amount Paid:</span>
+          <b>₹${previousPaid.toFixed(2)}</b>
+        </div>
+
+        <div class="row">
+          <span>This Payment:</span>
+          <b>₹${amount.toFixed(2)}</b>
+        </div>
+
+        <div class="row">
+          <span>Total Paid:</span>
+          <b>₹${paidAfter.toFixed(2)}</b>
+        </div>
+
+        <div class="row">
+          <span>Job Total:</span>
+          <b>₹${total.toFixed(2)}</b>
+        </div>
+
+        <div class="row">
+          <span>Remaining Balance:</span>
+          <b>₹${balance.toFixed(2)}</b>
+        </div>
+
+        ${payment.transaction_reference
+          ? `<p>Reference: ${escapeHTML(payment.transaction_reference)}</p>`
+          : ""}
+      </div>
+
+      <div class="footer">
+        <h3>Payment Received. Thank You!</h3>
+        <p>Thank you for choosing Vasu Service Center.</p>
+        <p>Ride Safe. Ride Smooth.</p>
+      </div>
+
+      <button class="no-print" onclick="window.print()">
+        PRINT / SAVE AS PDF
+      </button>
+
+    </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+}
 // RECORD PAYMENT
 async function recordPayment() {
   const jobId = document.getElementById("paymentJobCard").value;
