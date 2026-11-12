@@ -767,6 +767,253 @@ async function loadJobCards() {
     area.appendChild(card);
   });
 }
+  async function printJobInvoice(job, customer, bike, parts) {
+
+  // Open print window immediately
+  const printWindow = window.open("", "_blank");
+
+  if (!printWindow) {
+    alert("Please allow pop-ups to print the invoice.");
+    return;
+  }
+
+  // Load payment history
+  const { data: payments, error } = await db
+    .from("payments")
+    .select("amount")
+    .eq("job_card_id", job.id);
+
+  if (error) {
+    printWindow.close();
+    alert("Could not load payment details: " + error.message);
+    return;
+  }
+
+  const paid = (payments || []).reduce(
+    (sum, payment) => sum + Number(payment.amount || 0), 0
+  );
+
+  const total = Number(job.total_amount || 0);
+  const balance = Math.max(0, total - paid);
+
+  const escapeHTML = value =>
+    String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[char]);
+
+  const partRows = parts.length
+    ? parts.map(part => `
+        <tr>
+          <td>${escapeHTML(part.item_name)}</td>
+          <td>${escapeHTML(part.brand || "-")}</td>
+          <td>${Number(part.quantity)}</td>
+          <td>₹${Number(part.unit_price).toFixed(2)}</td>
+          <td>₹${Number(part.total_price).toFixed(2)}</td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="5">No spare parts used</td></tr>`;
+
+  const invoiceDate = new Date().toLocaleDateString("en-IN");
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Invoice - Job #${escapeHTML(job.job_number)}</title>
+
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          color: #222;
+          margin: 30px;
+        }
+
+        .header {
+          background: #101010;
+          color: white;
+          padding: 22px;
+          border-bottom: 6px solid #ffd400;
+        }
+
+        .header h1 {
+          margin: 0;
+          font-size: 27px;
+        }
+
+        .yellow {
+          color: #ffd400;
+        }
+
+        .section {
+          margin-top: 25px;
+        }
+
+        .row {
+          display: flex;
+          justify-content: space-between;
+          gap: 20px;
+        }
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 12px;
+        }
+
+        th, td {
+          border: 1px solid #ccc;
+          padding: 10px;
+          text-align: left;
+        }
+
+        th {
+          background: #ffd400;
+          color: #111;
+        }
+
+        .totals {
+          margin-left: auto;
+          width: 300px;
+          margin-top: 20px;
+        }
+
+        .totals p {
+          display: flex;
+          justify-content: space-between;
+        }
+
+        .grand {
+          font-size: 20px;
+          font-weight: bold;
+          border-top: 2px solid #222;
+          padding-top: 10px;
+        }
+
+        .footer {
+          margin-top: 45px;
+          text-align: center;
+          border-top: 1px solid #ccc;
+          padding-top: 15px;
+        }
+
+        @page {
+          size: A4;
+          margin: 12mm;
+        }
+
+        @media print {
+          body { margin: 0; }
+          .no-print { display: none; }
+        }
+      </style>
+    </head>
+
+    <body>
+
+      <div class="header">
+        <h1>VASU <span class="yellow">SERVICE CENTER</span></h1>
+        <p>Two-Wheeler Service & Care</p>
+        <p>Motorcycles | Scooters</p>
+      </div>
+
+      <div class="row section">
+        <div>
+          <h2>INVOICE</h2>
+          <p><b>Job Number:</b> ${escapeHTML(job.job_number)}</p>
+          <p><b>Invoice Date:</b> ${invoiceDate}</p>
+        </div>
+
+        <div>
+          <h3>Customer Details</h3>
+          <p>${escapeHTML(customer.full_name)}</p>
+          <p>Mobile: ${escapeHTML(customer.mobile)}</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Bike Details</h3>
+        <p>
+          ${escapeHTML(bike.brand)} ${escapeHTML(bike.model)}
+        </p>
+        <p>Registration: ${escapeHTML(bike.registration_number)}</p>
+      </div>
+
+      <div class="section">
+        <h3>Service Details</h3>
+        <p><b>Complaint:</b> ${escapeHTML(job.customer_complaint || "-")}</p>
+        <p><b>Observations:</b> ${escapeHTML(job.mechanic_observations || "-")}</p>
+        <p><b>Work Performed:</b> ${escapeHTML(job.work_performed || "-")}</p>
+        <p><b>Mechanic:</b> ${escapeHTML(job.mechanic_name || "-")}</p>
+      </div>
+
+      <div class="section">
+        <h3>Spare Parts</h3>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Brand</th>
+              <th>Qty</th>
+              <th>Unit Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${partRows}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="totals">
+        <p>
+          <span>Labour:</span>
+          <b>₹${Number(job.labour_charge || 0).toFixed(2)}</b>
+        </p>
+
+        <p>
+          <span>Discount:</span>
+          <b>₹${Number(job.discount || 0).toFixed(2)}</b>
+        </p>
+
+        <p class="grand">
+          <span>Grand Total:</span>
+          <span>₹${total.toFixed(2)}</span>
+        </p>
+
+        <p>
+          <span>Amount Paid:</span>
+          <b>₹${paid.toFixed(2)}</b>
+        </p>
+
+        <p>
+          <span>Balance Due:</span>
+          <b>₹${balance.toFixed(2)}</b>
+        </p>
+      </div>
+
+      <div class="footer">
+        <h3>Thank You!</h3>
+        <p>Thank you for choosing Vasu Service Center.</p>
+        <p>Ride Safe. Ride Smooth.</p>
+      </div>
+
+      <button class="no-print" onclick="window.print()">
+        PRINT / SAVE AS PDF
+      </button>
+
+    </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+}
   async function updateJobStatus(jobId, newStatus) {
 
   const allowedStatuses = [
