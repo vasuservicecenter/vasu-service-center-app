@@ -757,6 +757,13 @@ async function loadJobCards() {
     card.appendChild(statusSelect);
     card.appendChild(updateButton);
 
+    const invoiceButton = document.createElement("button");
+    invoiceButton.textContent = "🧾 PRINT INVOICE";
+    invoiceButton.onclick = () =>
+      printJobInvoice(job, customer, bike, parts);
+
+    card.appendChild(invoiceButton);
+    
     area.appendChild(card);
   });
 }
