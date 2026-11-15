@@ -2132,7 +2132,415 @@ async function loadExpenses() {
 // Install the section automatically.
 installExpenseSection();
   
-async function start() {
+// ===========================================
+// VASU SERVICE CENTER - PRODUCT SALES & BILLING
+// ===========================================
+
+function installSalesSection() {
+  if (document.getElementById("salesSection")) return;
+
+  const inventory = document.getElementById("products").closest(".card");
+
+  const section = document.createElement("div");
+  section.className = "card";
+  section.id = "salesSection";
+
+  section.innerHTML = `
+    <h2>🛒 PRODUCT SALES & BILLING</h2>
+
+    <h3>Customer Details</h3>
+    <input id="saleCustomerName" placeholder="Customer name (optional)">
+    <input id="saleCustomerMobile" placeholder="Mobile number (optional)">
+
+    <h3>Products</h3>
+    <div id="salesProductRows"></div>
+
+    <button type="button" onclick="addSalesProductRow()">
+      + ADD PRODUCT
+    </button>
+
+    <input id="saleDiscount" type="number" min="0"
+      step="0.01" placeholder="Discount (₹)" value="0">
+
+    <select id="salePaymentMethod">
+      <option value="cash">Cash</option>
+      <option value="upi">UPI</option>
+      <option value="card">Card</option>
+      <option value="bank">Bank Transfer</option>
+    </select>
+
+    <button onclick="saveProductSale()" id="saveSaleButton">
+      COMPLETE SALE & GENERATE BILL
+    </button>
+
+    <div id="saleMessage"></div>
+
+    <hr>
+
+    <h3>📊 Sales Summary</h3>
+    <button onclick="loadSalesHistory()">REFRESH SALES REPORT</button>
+    <div id="salesSummary"></div>
+
+    <hr>
+
+    <h3>📋 Recent Sales</h3>
+    <div id="salesHistory">No sales loaded.</div>
+  `;
+
+  inventory.insertAdjacentElement("afterend", section);
+  addSalesProductRow();
+}
+
+let salesProducts = [];
+
+async function loadSalesProducts() {
+  const { data, error } = await db
+    .from("products")
+    .select("id,product_name,brand,selling_price,purchase_price,stock_quantity")
+    .gt("stock_quantity", 0)
+    .order("product_name");
+
+  if (error) {
+    alert("Product loading failed: " + error.message);
+    return;
+  }
+
+  salesProducts = data || [];
+  const rows = document.querySelectorAll(".salesProductSelect");
+
+  rows.forEach(select => {
+    const previous = select.value;
+    select.innerHTML = '<option value="">Select Product</option>';
+
+    salesProducts.forEach(product => {
+      const option = document.createElement("option");
+      option.value = product.id;
+      option.textContent =
+        product.product_name + " - " +
+        (product.brand || "") +
+        " | ₹" + Number(product.selling_price).toFixed(2) +
+        " | Stock: " + product.stock_quantity;
+
+      select.appendChild(option);
+    });
+
+    select.value = previous;
+  });
+}
+
+function addSalesProductRow() {
+  const container = document.getElementById("salesProductRows");
+
+  const row = document.createElement("div");
+  row.className = "card";
+
+  const select = document.createElement("select");
+  select.className = "salesProductSelect";
+  select.style.width = "100%";
+  select.style.padding = "12px";
+  select.style.background = "#101010";
+  select.style.color = "white";
+
+  select.innerHTML = '<option value="">Loading products...</option>';
+
+  const quantity = document.createElement("input");
+  quantity.type = "number";
+  quantity.min = "0.01";
+  quantity.step = "0.01";
+  quantity.value = "1";
+  quantity.className = "salesProductQuantity";
+  quantity.placeholder = "Quantity";
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.textContent = "REMOVE";
+  remove.className = "reject";
+  remove.onclick = () => row.remove();
+
+  row.append(select, quantity, remove);
+  container.appendChild(row);
+
+  loadSalesProducts();
+}
+
+async function saveProductSale() {
+  const rows = document.querySelectorAll("#salesProductRows > .card");
+  const items = [];
+
+  for (const row of rows) {
+    const productId = row.querySelector(".salesProductSelect").value;
+    const quantity = Number(
+      row.querySelector(".salesProductQuantity").value
+    );
+
+    if (!productId) continue;
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      alert("Enter a valid product quantity.");
+      return;
+    }
+
+    items.push({
+      product_id: productId,
+      quantity: quantity
+    });
+  }
+
+  if (items.length === 0) {
+    alert("Please select at least one product.");
+    return;
+  }
+
+  const discount = Number(
+    document.getElementById("saleDiscount").value || 0
+  );
+
+  if (!Number.isFinite(discount) || discount < 0) {
+    alert("Enter a valid discount.");
+    return;
+  }
+
+  const button = document.getElementById("saveSaleButton");
+  const message = document.getElementById("saleMessage");
+
+  button.disabled = true;
+  button.textContent = "PROCESSING SALE...";
+  message.textContent = "";
+
+  const { data, error } = await db.rpc("create_product_sale", {
+    p_customer_name:
+      document.getElementById("saleCustomerName").value.trim() || null,
+    p_customer_mobile:
+      document.getElementById("saleCustomerMobile").value.trim() || null,
+    p_payment_method:
+      document.getElementById("salePaymentMethod").value,
+    p_discount: discount,
+    p_items: items
+  });
+
+  button.disabled = false;
+  button.textContent = "COMPLETE SALE & GENERATE BILL";
+
+  if (error) {
+    message.textContent = "Sale failed: " + error.message;
+    return;
+  }
+
+  const sale = Array.isArray(data) ? data[0] : data;
+
+  message.textContent =
+    "Sale #" + sale.sale_number +
+    " completed! Total: ₹" +
+    Number(sale.total_amount).toFixed(2);
+
+  alert(message.textContent);
+
+  const saleDetails = {
+    id: sale.id,
+    sale_number: sale.sale_number
+  };
+
+  document.getElementById("saleCustomerName").value = "";
+  document.getElementById("saleCustomerMobile").value = "";
+  document.getElementById("saleDiscount").value = "0";
+  document.getElementById("salesProductRows").replaceChildren();
+
+  addSalesProductRow();
+
+  await loadProducts();
+  await loadInventoryHistory();
+  await loadSalesHistory();
+
+  printProductSale(saleDetails);
+}
+
+async function loadSalesHistory() {
+  const summary = document.getElementById("salesSummary");
+  const history = document.getElementById("salesHistory");
+
+  summary.textContent = "Loading report...";
+  history.textContent = "Loading sales...";
+
+  const { data, error } = await db
+    .from("sales")
+    .select("id,sale_number,customer_name,customer_mobile,subtotal,discount,total_amount,payment_method,sale_date")
+    .order("sale_date", { ascending: false });
+
+  if (error) {
+    summary.textContent = "Report error: " + error.message;
+    history.textContent = "";
+    return;
+  }
+
+  const sales = data || [];
+  const now = new Date();
+
+  const today = now.toLocaleDateString("en-CA");
+  const month = today.slice(0, 7);
+
+  const todaySales = sales.filter(s =>
+    new Date(s.sale_date).toLocaleDateString("en-CA") === today
+  );
+
+  const monthSales = sales.filter(s =>
+    new Date(s.sale_date).toLocaleDateString("en-CA").startsWith(month)
+  );
+
+  const todayTotal = todaySales.reduce(
+    (sum, s) => sum + Number(s.total_amount), 0
+  );
+
+  const monthTotal = monthSales.reduce(
+    (sum, s) => sum + Number(s.total_amount), 0
+  );
+
+  summary.innerHTML = `
+    <div class="card">
+      <h3>TODAY'S SALES</h3>
+      <p>Number of bills: ${todaySales.length}</p>
+      <h2>₹${todayTotal.toFixed(2)}</h2>
+    </div>
+
+    <div class="card">
+      <h3>THIS MONTH'S SALES</h3>
+      <p>Number of bills: ${monthSales.length}</p>
+      <h2>₹${monthTotal.toFixed(2)}</h2>
+    </div>
+  `;
+
+  history.replaceChildren();
+
+  if (!sales.length) {
+    history.textContent = "No sales recorded yet.";
+    return;
+  }
+
+  sales.slice(0, 50).forEach(sale => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.style.whiteSpace = "pre-line";
+    details.textContent =
+      "SALE #" + sale.sale_number +
+      "\nCustomer: " + (sale.customer_name || "Walk-in customer") +
+      "\nMobile: " + (sale.customer_mobile || "-") +
+      "\nDate: " + new Date(sale.sale_date).toLocaleString("en-IN") +
+      "\nSubtotal: ₹" + Number(sale.subtotal).toFixed(2) +
+      "\nDiscount: ₹" + Number(sale.discount).toFixed(2) +
+      "\nTotal: ₹" + Number(sale.total_amount).toFixed(2) +
+      "\nPayment: " + sale.payment_method.toUpperCase();
+
+    const print = document.createElement("button");
+    print.textContent = "🧾 PRINT BILL";
+    print.onclick = () => printProductSale(sale);
+
+    card.append(details, print);
+    history.appendChild(card);
+  });
+}
+
+async function printProductSale(sale) {
+  const { data: items, error } = await db
+    .from("sale_items")
+    .select("product_name,brand,quantity,unit_price,total_price")
+    .eq("sale_id", sale.id);
+
+  if (error) {
+    alert("Could not load bill items: " + error.message);
+    return;
+  }
+
+  const { data: bill, error: billError } = await db
+    .from("sales")
+    .select("*")
+    .eq("id", sale.id)
+    .single();
+
+  if (billError) {
+    alert("Could not load bill details.");
+    return;
+  }
+
+  const win = window.open("", "_blank");
+
+  if (!win) {
+    alert("Please allow pop-ups to print the bill.");
+    return;
+  }
+
+  const escape = value => String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[c]);
+
+  const rows = (items || []).map(item => `
+    <tr>
+      <td>${escape(item.product_name)} ${escape(item.brand || "")}</td>
+      <td>${item.quantity}</td>
+      <td>₹${Number(item.unit_price).toFixed(2)}</td>
+      <td>₹${Number(item.total_price).toFixed(2)}</td>
+    </tr>
+  `).join("");
+
+  win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>VSC Sale Bill #${bill.sale_number}</title>
+      <style>
+        body { font-family: Arial; margin: 30px; color: #222; }
+        header { background: #101010; color: white; padding: 20px; border-bottom: 6px solid #ffd400; }
+        header span { color: #ffd400; }
+        table { width: 100%; border-collapse: collapse; margin-top: 25px; }
+        th,td { padding: 12px; border: 1px solid #ccc; text-align: left; }
+        .total { text-align: right; margin-top: 25px; }
+        @page { size: A4; margin: 12mm; }
+      </style>
+    </head>
+    <body>
+      <header>
+        <h1>VASU <span>SERVICE CENTER</span></h1>
+        <p>Two-Wheeler Service & Care</p>
+      </header>
+
+      <h2>PRODUCT SALES BILL</h2>
+      <p><b>Bill Number:</b> ${bill.sale_number}</p>
+      <p><b>Date:</b> ${new Date(bill.sale_date).toLocaleString("en-IN")}</p>
+      <p><b>Customer:</b> ${escape(bill.customer_name || "Walk-in customer")}</p>
+      <p><b>Mobile:</b> ${escape(bill.customer_mobile || "-")}</p>
+
+      <table>
+        <thead>
+          <tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      <div class="total">
+        <p>Subtotal: ₹${Number(bill.subtotal).toFixed(2)}</p>
+        <p>Discount: ₹${Number(bill.discount).toFixed(2)}</p>
+        <h2>Grand Total: ₹${Number(bill.total_amount).toFixed(2)}</h2>
+        <p>Payment: ${escape(bill.payment_method.toUpperCase())}</p>
+      </div>
+
+      <hr>
+      <h3>Thank you for choosing Vasu Service Center!</h3>
+      <button onclick="window.print()">PRINT / SAVE AS PDF</button>
+    </body>
+    </html>
+  `);
+
+  win.document.close();
+}
+
+// Install sales feature automatically.
+installSalesSection();
+  
+  async function start() {
   const {data} = await db.auth.getSession();
 
   if(data.session) {
