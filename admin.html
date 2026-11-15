@@ -549,43 +549,60 @@ document.getElementById("jobCustomer").addEventListener("change", async function
 async function saveJobCard() {
   const customerId = document.getElementById("jobCustomer").value;
   const bikeId = document.getElementById("jobBike").value;
-  const productId = document.getElementById("jobPartProduct").value;
 
   const labour = Number(document.getElementById("jobLabour").value || 0);
   const discount = Number(document.getElementById("jobDiscount").value || 0);
-  const partQty = Number(document.getElementById("jobPartQty").value || 1);
 
   if (!customerId || !bikeId) {
     showMessage("Please select a customer and bike.");
     return;
   }
 
-  if (labour < 0 || discount < 0 || discount > labour) {
+  if (
+    !Number.isFinite(labour) ||
+    !Number.isFinite(discount) ||
+    labour < 0 ||
+    discount < 0 ||
+    discount > labour
+  ) {
     showMessage("Please check labour and discount amounts.");
     return;
   }
 
-  if (productId && (!Number.isInteger(partQty) || partQty <= 0)) {
-    showMessage("Please enter a valid whole-number quantity.");
-    return;
+  const parts = [];
+  const rows = document.querySelectorAll(
+    "#jobPartsContainer > .card"
+  );
+
+  for (const row of rows) {
+    const productId = row.querySelector(".jobPartProduct").value;
+    const quantity = Number(
+      row.querySelector(".jobPartQuantity").value
+    );
+
+    if (!productId) continue;
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      showMessage("Please enter a valid whole-number quantity.");
+      return;
+    }
+
+    parts.push({
+      product_id: productId,
+      quantity: quantity
+    });
   }
 
   const jobData = {
     customer_id: customerId,
     bike_id: bikeId,
-    odometer: document.getElementById("jobOdometer").value
-      ? Number(document.getElementById("jobOdometer").value)
-      : null,
+    odometer: document.getElementById("jobOdometer").value || null,
     customer_complaint: document.getElementById("jobComplaint").value.trim(),
     mechanic_observations: document.getElementById("jobObservation").value.trim(),
     work_performed: document.getElementById("jobWork").value.trim(),
     mechanic_name: document.getElementById("jobMechanic").value.trim(),
     labour_charge: labour,
-    discount: discount,
-    subtotal: labour,
-    total_amount: labour - discount,
-    status: "received",
-    payment_status: "unpaid"
+    discount: discount
   };
 
   const button = document.querySelector(
@@ -595,54 +612,38 @@ async function saveJobCard() {
   button.disabled = true;
   button.textContent = "SAVING...";
 
-  const { data: savedJob, error } = await db
-    .from("job_cards")
-    .insert(jobData)
-    .select("id, job_number")
-    .single();
+  const { data, error } = await db.rpc(
+    "create_job_card_with_parts",
+    {
+      p_job_data: jobData,
+      p_parts: parts
+    }
+  );
+
+  button.disabled = false;
+  button.textContent = "SAVE JOB CARD";
 
   if (error) {
-    button.disabled = false;
-    button.textContent = "SAVE JOB CARD";
     showMessage("Job card failed: " + error.message);
     return;
   }
 
-  if (productId) {
-    const { error: partError } = await db.rpc("add_job_card_part", {
-      p_job_card_id: savedJob.id,
-      p_product_id: productId,
-      p_quantity: partQty
-    });
+  const result = Array.isArray(data) ? data[0] : data;
 
-    if (partError) {
-      button.disabled = false;
-      button.textContent = "SAVE JOB CARD";
-
-      showMessage(
-        "Job card created, but spare part was not added: " +
-        partError.message
-      );
-
-      await loadJobCards();
-      return;
-    }
-  }
-
-  showMessage("Job card created! Number: " + savedJob.job_number);
+  showMessage(
+    "Job card created! Number: " + result.job_number +
+    " | Total: ₹" + Number(result.total_amount).toFixed(2)
+  );
 
   document.querySelectorAll(
     "#jobForm input, #jobForm select, #jobForm textarea"
   ).forEach(el => el.value = "");
 
   document.getElementById("jobDiscount").value = 0;
-  document.getElementById("jobPartQty").value = 1;
-
-  button.disabled = false;
-  button.textContent = "SAVE JOB CARD";
 
   document.getElementById("jobForm").classList.add("hidden");
 
+  await loadJobPartProducts();
   await loadJobCards();
   await loadPaymentJobCards();
 }
