@@ -1897,7 +1897,241 @@ async function logout() {
   loginBox.classList.remove("hidden");
   showMessage("Logged out.");
 }
+// ===================================
+// VASU SERVICE CENTER - EXPENSE MANAGER
+// ===================================
 
+function installExpenseSection() {
+  if (document.getElementById("expenseSection")) return;
+
+  const inventoryCard = document.getElementById("products").closest(".card");
+
+  const section = document.createElement("div");
+  section.className = "card";
+  section.id = "expenseSection";
+
+  section.innerHTML = `
+    <h2>💰 EXPENSES & PROFIT TRACKER</h2>
+
+    <h3>➕ Add New Expense</h3>
+
+    <select id="expenseCategory"
+      style="width:100%;padding:14px;margin:8px 0;background:#101010;color:white;border:1px solid #555;border-radius:5px;">
+      <option value="">Select expense category</option>
+      <option value="Rent">Rent</option>
+      <option value="Salaries">Salaries</option>
+      <option value="Electricity">Electricity</option>
+      <option value="Spare Parts Purchase">Spare Parts Purchase</option>
+      <option value="Tools & Equipment">Tools & Equipment</option>
+      <option value="Maintenance">Maintenance</option>
+      <option value="Transport">Transport</option>
+      <option value="Food & Refreshments">Food & Refreshments</option>
+      <option value="Other">Other</option>
+    </select>
+
+    <input id="expenseAmount" type="number"
+      min="0.01" step="0.01" placeholder="Amount (₹)">
+
+    <input id="expenseDescription"
+      placeholder="Description (optional)">
+
+    <select id="expenseMethod"
+      style="width:100%;padding:14px;margin:8px 0;background:#101010;color:white;border:1px solid #555;border-radius:5px;">
+      <option value="cash">Cash</option>
+      <option value="upi">UPI</option>
+      <option value="card">Card</option>
+      <option value="bank">Bank Transfer</option>
+    </select>
+
+    <input id="expenseDate" type="date">
+
+    <button id="saveExpenseButton" onclick="saveExpense()">
+      SAVE EXPENSE
+    </button>
+
+    <hr>
+
+    <h3>📊 Financial Overview</h3>
+
+    <button onclick="loadExpenses()">REFRESH REPORT</button>
+
+    <div id="expenseSummary">
+      Tap REFRESH REPORT to view your financial summary.
+    </div>
+
+    <hr>
+
+    <h3>📋 Recent Expenses</h3>
+    <div id="expenseHistory">No expenses loaded.</div>
+  `;
+
+  inventoryCard.insertAdjacentElement("afterend", section);
+
+  document.getElementById("expenseDate").value =
+    new Date().toLocaleDateString("en-CA");
+}
+
+async function saveExpense() {
+  const category = document.getElementById("expenseCategory").value;
+  const amount = Number(document.getElementById("expenseAmount").value);
+  const description =
+    document.getElementById("expenseDescription").value.trim();
+  const method = document.getElementById("expenseMethod").value;
+  const date = document.getElementById("expenseDate").value;
+
+  if (!category || !date || !Number.isFinite(amount) || amount <= 0) {
+    alert("Please enter a category, valid amount and date.");
+    return;
+  }
+
+  const button = document.getElementById("saveExpenseButton");
+  button.disabled = true;
+  button.textContent = "SAVING...";
+
+  const { error } = await db.from("expenses").insert({
+    category: category,
+    amount: amount,
+    description: description || null,
+    payment_method: method,
+    expense_date: date,
+    created_by: currentUser ? currentUser.id : null
+  });
+
+  button.disabled = false;
+  button.textContent = "SAVE EXPENSE";
+
+  if (error) {
+    alert("Expense saving failed: " + error.message);
+    return;
+  }
+
+  alert("Expense saved successfully!");
+
+  document.getElementById("expenseCategory").value = "";
+  document.getElementById("expenseAmount").value = "";
+  document.getElementById("expenseDescription").value = "";
+
+  await loadExpenses();
+}
+
+async function loadExpenses() {
+  const summary = document.getElementById("expenseSummary");
+  const history = document.getElementById("expenseHistory");
+
+  summary.textContent = "Calculating financial report...";
+  history.textContent = "Loading expenses...";
+
+  const [expenseResult, paymentResult] = await Promise.all([
+    db.from("expenses")
+      .select("id,category,amount,description,payment_method,expense_date,created_at")
+      .order("expense_date", { ascending: false }),
+
+    db.from("payments")
+      .select("amount,payment_date")
+  ]);
+
+  if (expenseResult.error || paymentResult.error) {
+    summary.textContent =
+      "Report error: " +
+      (expenseResult.error || paymentResult.error).message;
+    history.textContent = "Could not load records.";
+    return;
+  }
+
+  const expenses = expenseResult.data || [];
+  const payments = paymentResult.data || [];
+
+  const now = new Date();
+
+  const today = now.toLocaleDateString("en-CA");
+  const month = today.slice(0, 7);
+
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  weekStart.setHours(0, 0, 0, 0);
+
+  const weekDate = weekStart.toLocaleDateString("en-CA");
+
+  const todayExpenses = expenses
+    .filter(e => e.expense_date === today)
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const weekExpenses = expenses
+    .filter(e => e.expense_date >= weekDate && e.expense_date <= today)
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const monthExpenses = expenses
+    .filter(e => e.expense_date.startsWith(month))
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const todayIncome = payments
+    .filter(p => p.payment_date &&
+      new Date(p.payment_date).toLocaleDateString("en-CA") === today)
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const monthIncome = payments
+    .filter(p => p.payment_date &&
+      new Date(p.payment_date).toLocaleDateString("en-CA").startsWith(month))
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const todayBalance = todayIncome - todayExpenses;
+  const monthBalance = monthIncome - monthExpenses;
+
+  summary.innerHTML = `
+    <div class="card">
+      <h3>📅 TODAY</h3>
+      <p>Money received: ₹${todayIncome.toFixed(2)}</p>
+      <p>Expenses: ₹${todayExpenses.toFixed(2)}</p>
+      <h3>Net: ₹${todayBalance.toFixed(2)}</h3>
+    </div>
+
+    <div class="card">
+      <h3>📆 THIS WEEK</h3>
+      <p>Expenses: ₹${weekExpenses.toFixed(2)}</p>
+    </div>
+
+    <div class="card">
+      <h3>📊 THIS MONTH</h3>
+      <p>Money received: ₹${monthIncome.toFixed(2)}</p>
+      <p>Expenses: ₹${monthExpenses.toFixed(2)}</p>
+      <h3>Net: ₹${monthBalance.toFixed(2)}</h3>
+    </div>
+
+    <p class="small">
+      Net = recorded customer payments received minus recorded expenses.
+      This is not a complete accounting profit calculation.
+    </p>
+  `;
+
+  history.replaceChildren();
+
+  if (expenses.length === 0) {
+    history.textContent = "No expenses recorded yet.";
+    return;
+  }
+
+  expenses.slice(0, 30).forEach(expense => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.style.whiteSpace = "pre-line";
+
+    details.textContent =
+      "Category: " + expense.category +
+      "\nAmount: ₹" + Number(expense.amount).toFixed(2) +
+      "\nDate: " + expense.expense_date +
+      "\nMethod: " + expense.payment_method.toUpperCase() +
+      "\nDescription: " + (expense.description || "-");
+
+    card.appendChild(details);
+    history.appendChild(card);
+  });
+}
+
+// Install the section automatically.
+installExpenseSection();
+  
 async function start() {
   const {data} = await db.auth.getSession();
 
