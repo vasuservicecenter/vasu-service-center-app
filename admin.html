@@ -2775,6 +2775,220 @@ async function loadMainDashboard() {
 
 // Install dashboard automatically.
 installMainDashboard();
+
+  // ======================================
+// VSC CUSTOMER SERVICE HISTORY & REMINDERS
+// ======================================
+
+function installCustomerServiceTools() {
+  if (document.getElementById("customerServiceTools")) return;
+
+  const customerCard = document
+    .getElementById("customers")
+    .closest(".card");
+
+  const section = document.createElement("div");
+  section.className = "card";
+  section.id = "customerServiceTools";
+
+  section.innerHTML = `
+    <h2>🏍️ BIKE SERVICE HISTORY & REMINDERS</h2>
+
+    <input
+      id="bikeHistorySearch"
+      placeholder="Enter bike registration number..."
+    >
+
+    <button onclick="searchBikeHistory()">
+      SEARCH BIKE
+    </button>
+
+    <div id="bikeHistoryResults">
+      Search a registration number to view its details.
+    </div>
+  `;
+
+  customerCard.insertAdjacentElement("afterend", section);
+}
+
+async function searchBikeHistory() {
+  const search = document
+    .getElementById("bikeHistorySearch")
+    .value.trim()
+    .toUpperCase();
+
+  const area = document.getElementById("bikeHistoryResults");
+
+  if (!search) {
+    area.textContent = "Enter a registration number.";
+    return;
+  }
+
+  area.textContent = "Searching...";
+
+  const { data: bikes, error } = await db
+    .from("bikes")
+    .select("id,customer_id,brand,model,registration_number")
+    .ilike("registration_number", "%" + search + "%");
+
+  if (error) {
+    area.textContent = "Search failed: " + error.message;
+    return;
+  }
+
+  area.replaceChildren();
+
+  if (!bikes || !bikes.length) {
+    area.textContent = "No matching bikes found.";
+    return;
+  }
+
+  for (const bike of bikes) {
+    const [customerResult, jobsResult] = await Promise.all([
+      db.from("customers")
+        .select("id,full_name,mobile")
+        .eq("id", bike.customer_id)
+        .single(),
+
+      db.from("job_cards")
+        .select("id,job_number,received_at,status,total_amount,work_performed,next_service_date")
+        .eq("bike_id", bike.id)
+        .order("received_at", { ascending: false })
+    ]);
+
+    if (customerResult.error || jobsResult.error) {
+      const errorCard = document.createElement("p");
+      errorCard.textContent =
+        "Could not load bike history: " +
+        (customerResult.error || jobsResult.error).message;
+      area.appendChild(errorCard);
+      continue;
+    }
+
+    const customer = customerResult.data;
+    const jobs = jobsResult.data || [];
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const title = document.createElement("h3");
+    title.textContent =
+      bike.brand + " " + bike.model;
+
+    const details = document.createElement("p");
+    details.style.whiteSpace = "pre-line";
+
+    details.textContent =
+      "Registration: " + bike.registration_number +
+      "\nCustomer: " + customer.full_name +
+      "\nMobile: " + customer.mobile +
+      "\nTotal service visits: " + jobs.length;
+
+    card.append(title, details);
+
+    const historyTitle = document.createElement("h3");
+    historyTitle.textContent = "📋 SERVICE HISTORY";
+    card.appendChild(historyTitle);
+
+    if (!jobs.length) {
+      const empty = document.createElement("p");
+      empty.textContent = "No job cards found for this bike.";
+      card.appendChild(empty);
+    }
+
+    jobs.forEach(job => {
+      const item = document.createElement("p");
+      item.style.whiteSpace = "pre-line";
+
+      item.textContent =
+        "Job #" + job.job_number +
+        "\nDate: " + new Date(job.received_at).toLocaleDateString("en-IN") +
+        "\nStatus: " + job.status +
+        "\nWork: " + (job.work_performed || "-") +
+        "\nAmount: ₹" + Number(job.total_amount || 0).toFixed(2) +
+        "\nNext service: " + (job.next_service_date || "Not scheduled");
+
+      card.appendChild(item);
+    });
+
+    if (jobs.length) {
+      const latestJob = jobs[0];
+
+      const reminderTitle = document.createElement("h3");
+      reminderTitle.textContent = "🔔 NEXT SERVICE REMINDER";
+      card.appendChild(reminderTitle);
+
+      const dateInput = document.createElement("input");
+      dateInput.type = "date";
+      dateInput.value = latestJob.next_service_date || "";
+
+      const saveButton = document.createElement("button");
+      saveButton.textContent = "SAVE NEXT SERVICE DATE";
+
+      saveButton.onclick = async () => {
+        if (!dateInput.value) {
+          alert("Please select a service date.");
+          return;
+        }
+
+        const { error } = await db
+          .from("job_cards")
+          .update({ next_service_date: dateInput.value })
+          .eq("id", latestJob.id);
+
+        if (error) {
+          alert("Could not save date: " + error.message);
+          return;
+        }
+
+        alert("Next service date saved!");
+        await searchBikeHistory();
+      };
+
+      card.append(dateInput, saveButton);
+
+      const whatsapp = document.createElement("button");
+      whatsapp.textContent = "💬 WHATSAPP SERVICE REMINDER";
+
+      whatsapp.onclick = () => {
+        const mobile = String(customer.mobile || "")
+          .replace(/\D/g, "");
+
+        if (!mobile) {
+          alert("Customer mobile number is missing.");
+          return;
+        }
+
+        const number = mobile.length === 10
+          ? "91" + mobile
+          : mobile;
+
+        const message =
+          "Hello " + customer.full_name +
+          "! This is Vasu Service Center. " +
+          "Your " + bike.brand + " " + bike.model +
+          " (" + bike.registration_number + ")" +
+          " is due for its next service on " +
+          dateInput.value +
+          ". Please contact us to book your service. Thank you!";
+
+        window.open(
+          "https://wa.me/" + number +
+          "?text=" + encodeURIComponent(message),
+          "_blank"
+        );
+      };
+
+      card.appendChild(whatsapp);
+    }
+
+    area.appendChild(card);
+  }
+}
+
+// Install customer service tools.
+installCustomerServiceTools();
+  
   async function start() {
   const {data} = await db.auth.getSession();
 
