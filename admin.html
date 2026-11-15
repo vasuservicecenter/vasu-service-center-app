@@ -2539,7 +2539,242 @@ async function printProductSale(sale) {
 
 // Install sales feature automatically.
 installSalesSection();
-  
+
+  // ===========================================
+// VASU SERVICE CENTER - MAIN BUSINESS DASHBOARD
+// ===========================================
+
+function installMainDashboard() {
+  if (document.getElementById("mainBusinessDashboard")) return;
+
+  const dashboard = document.getElementById("dashboard");
+
+  const section = document.createElement("div");
+  section.id = "mainBusinessDashboard";
+  section.className = "card";
+
+  section.innerHTML = `
+    <h2>📊 BUSINESS OVERVIEW</h2>
+    <p class="small">Your workshop at a glance.</p>
+
+    <button onclick="loadMainDashboard()">
+      🔄 REFRESH DASHBOARD
+    </button>
+
+    <div id="mainDashboardContent">
+      Loading your business information...
+    </div>
+  `;
+
+  dashboard.insertBefore(section, dashboard.firstElementChild);
+}
+
+async function loadMainDashboard() {
+  const area = document.getElementById("mainDashboardContent");
+
+  area.textContent = "Loading business reports...";
+
+  const results = await Promise.all([
+    db.from("job_cards")
+      .select("id,total_amount,status,payment_status,received_at"),
+
+    db.from("payments")
+      .select("job_card_id,amount,payment_date"),
+
+    db.from("sales")
+      .select("id,total_amount,sale_date"),
+
+    db.from("expenses")
+      .select("amount,expense_date"),
+
+    db.from("products")
+      .select("id,product_name,brand,stock_quantity,minimum_stock")
+  ]);
+
+  const failed = results.find(result => result.error);
+
+  if (failed) {
+    area.textContent =
+      "Dashboard loading error: " + failed.error.message;
+    return;
+  }
+
+  const jobs = results[0].data || [];
+  const payments = results[1].data || [];
+  const sales = results[2].data || [];
+  const expenses = results[3].data || [];
+  const products = results[4].data || [];
+
+  const now = new Date();
+  const today = now.toLocaleDateString("en-CA");
+  const month = today.slice(0, 7);
+
+  const isToday = date =>
+    date && new Date(date).toLocaleDateString("en-CA") === today;
+
+  const isThisMonth = date =>
+    date && new Date(date).toLocaleDateString("en-CA").startsWith(month);
+
+  const todayService = payments
+    .filter(p => isToday(p.payment_date))
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const monthlyService = payments
+    .filter(p => isThisMonth(p.payment_date))
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const todayProduct = sales
+    .filter(s => isToday(s.sale_date))
+    .reduce((sum, s) => sum + Number(s.total_amount), 0);
+
+  const monthlyProduct = sales
+    .filter(s => isThisMonth(s.sale_date))
+    .reduce((sum, s) => sum + Number(s.total_amount), 0);
+
+  const todayExpense = expenses
+    .filter(e => e.expense_date === today)
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const monthlyExpense = expenses
+    .filter(e => e.expense_date.startsWith(month))
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const todayIncome = todayService + todayProduct;
+  const monthlyIncome = monthlyService + monthlyProduct;
+
+  const todayNet = todayIncome - todayExpense;
+  const monthlyNet = monthlyIncome - monthlyExpense;
+
+  const paidByJob = {};
+
+  payments.forEach(payment => {
+    if (!payment.job_card_id) return;
+
+    paidByJob[payment.job_card_id] =
+      (paidByJob[payment.job_card_id] || 0) +
+      Number(payment.amount);
+  });
+
+  const pendingPayments = jobs.reduce((sum, job) => {
+    return sum + Math.max(
+      0,
+      Number(job.total_amount || 0) -
+      (paidByJob[job.id] || 0)
+    );
+  }, 0);
+
+  const completedToday = jobs.filter(job =>
+    job.status === "completed" &&
+    isToday(job.received_at)
+  ).length;
+
+  const completedMonth = jobs.filter(job =>
+    job.status === "completed" &&
+    isThisMonth(job.received_at)
+  ).length;
+
+  const lowStock = products.filter(product =>
+    Number(product.stock_quantity || 0) <=
+    Number(product.minimum_stock || 0)
+  );
+
+  const money = value =>
+    "₹" + Number(value).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+
+  const card = (title, value, subtitle) => `
+    <div class="card">
+      <h3>${title}</h3>
+      <h2>${value}</h2>
+      <p class="small">${subtitle}</p>
+    </div>
+  `;
+
+  area.innerHTML = `
+    <h3>📅 TODAY'S PERFORMANCE</h3>
+
+    ${card("💰 Total Collections", money(todayIncome),
+      "Service payments + product sales")}
+
+    ${card("🔧 Service Collections", money(todayService),
+      "Payments received against job cards")}
+
+    ${card("🛒 Product Sales", money(todayProduct),
+      "Direct product sales")}
+
+    ${card("💸 Expenses", money(todayExpense),
+      "Expenses recorded today")}
+
+    ${card("📈 Net Cash Difference", money(todayNet),
+      "Collections minus recorded expenses")}
+
+    <hr>
+
+    <h3>📊 MONTHLY PERFORMANCE</h3>
+
+    ${card("Monthly Collections", money(monthlyIncome),
+      "Service payments + product sales")}
+
+    ${card("Monthly Service Collections", money(monthlyService),
+      "Job-card payments received")}
+
+    ${card("Monthly Product Sales", money(monthlyProduct),
+      "Direct product sales")}
+
+    ${card("Monthly Expenses", money(monthlyExpense),
+      "Expenses recorded this month")}
+
+    ${card("Monthly Net Difference", money(monthlyNet),
+      "Collections minus recorded expenses")}
+
+    <hr>
+
+    <h3>🏍️ WORKSHOP ACTIVITY</h3>
+
+    ${card("Completed Today", completedToday,
+      "Job cards marked completed today")}
+
+    ${card("Completed This Month", completedMonth,
+      "Job cards received and completed this month")}
+
+    ${card("Pending Payments", money(pendingPayments),
+      "Outstanding balance on all job cards")}
+
+    <hr>
+
+    <h3>⚠️ INVENTORY ALERTS</h3>
+
+    ${card("Low Stock Products", lowStock.length,
+      "Products at or below minimum stock")}
+
+    <div class="card">
+      <h3>LOW STOCK LIST</h3>
+      ${
+        lowStock.length
+          ? lowStock.map(p =>
+              "<p>" +
+              p.product_name + " (" + (p.brand || "-") + ")" +
+              "<br>Available: " + p.stock_quantity +
+              " | Minimum: " + p.minimum_stock +
+              "</p>"
+            ).join("")
+          : "<p>All products are above minimum stock. ✅</p>"
+      }
+    </div>
+
+    <p class="small">
+      Financial figures show recorded collections and expenses,
+      not audited accounting profit. Unpaid job cards are excluded
+      from collections. Product sales and job-card payments are
+      counted separately.
+    </p>
+  `;
+}
+
+// Install dashboard automatically.
+installMainDashboard();
   async function start() {
   const {data} = await db.auth.getSession();
 
