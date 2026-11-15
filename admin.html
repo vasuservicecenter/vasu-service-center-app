@@ -107,18 +107,13 @@ button{padding:12px 17px;border:0;border-radius:5px;background:var(--yellow);fon
     <input id="jobMechanic" placeholder="Mechanic name">
     <input id="jobLabour" type="number" placeholder="Labour charges">
     <input id="jobDiscount" type="number" placeholder="Discount" value="0">
-    <select id="jobPartProduct">
-  <option value="">Select Spare Part (Optional)</option>
-</select>
+    <h4>🔩 Spare Parts Used</h4>
 
-<input
-  id="jobPartQty"
-  type="number"
-  min="1"
-  step="1"
-  value="1"
-  placeholder="Quantity"
->
+<div id="jobPartsContainer"></div>
+
+<button type="button" onclick="addJobPartRow()">
+  + ADD ANOTHER SPARE PART
+</button>
     <button onclick="saveJobCard()">SAVE JOB CARD</button>
   </div>
 
@@ -453,11 +448,12 @@ async function loadCustomers() {
   });
     await loadJobPartProducts();
 }
-async function loadJobPartProducts() {
-  const select = document.getElementById("jobPartProduct");
+let jobPartProducts = [];
 
-  select.innerHTML =
-    '<option value="">Select Spare Part (Optional)</option>';
+async function loadJobPartProducts() {
+  const container = document.getElementById("jobPartsContainer");
+
+  container.replaceChildren();
 
   const { data, error } = await db
     .from("products")
@@ -470,18 +466,54 @@ async function loadJobPartProducts() {
     return;
   }
 
-  (data || []).forEach(product => {
+  jobPartProducts = data || [];
+
+  addJobPartRow();
+}
+
+function addJobPartRow() {
+  const container = document.getElementById("jobPartsContainer");
+
+  const row = document.createElement("div");
+  row.className = "card";
+
+  const select = document.createElement("select");
+  select.className = "jobPartProduct";
+  select.style.width = "100%";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select Spare Part";
+  select.appendChild(placeholder);
+
+  jobPartProducts.forEach(product => {
     const option = document.createElement("option");
     option.value = product.id;
-
     option.textContent =
-      product.product_name +
-      " - " + (product.brand || "No brand") +
-      " | ₹" + Number(product.selling_price || 0).toFixed(2) +
+      product.product_name + " - " +
+      (product.brand || "No brand") +
+      " | ₹" + Number(product.selling_price).toFixed(2) +
       " | Stock: " + product.stock_quantity;
 
     select.appendChild(option);
   });
+
+  const quantity = document.createElement("input");
+  quantity.type = "number";
+  quantity.className = "jobPartQuantity";
+  quantity.min = "1";
+  quantity.step = "1";
+  quantity.value = "1";
+  quantity.placeholder = "Quantity";
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.textContent = "REMOVE";
+  remove.className = "reject";
+  remove.onclick = () => row.remove();
+
+  row.append(select, quantity, remove);
+  container.appendChild(row);
 }
   
 document.getElementById("jobCustomer").addEventListener("change", async function() {
