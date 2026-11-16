@@ -3046,28 +3046,120 @@ installCustomerServiceTools();
     const card = document.createElement("div");
     card.className = "card";
 
+    const heading = document.createElement("h3");
+    heading.textContent = "🔧 Job #" + job.job_number;
+    card.appendChild(heading);
+
     const details = [
-      "Job #" + (job.job_number || ""),
       "Customer: " + (job.customer_name || ""),
       "Mobile: " + (job.customer_mobile || ""),
       "Bike: " + (job.bike_brand || "") + " " + (job.bike_model || ""),
       "Registration: " + (job.bike_registration || ""),
-      "Status: " + (job.status || ""),
-      "Complaint: " + (job.customer_complaint || "Not specified"),
-      "Observations: " + (job.mechanic_observations || "Not added"),
-      "Work performed: " + (job.work_performed || "Not added")
+      "Complaint: " + (job.customer_complaint || "Not specified")
     ];
 
-    const heading = document.createElement("h3");
-    heading.textContent = "🔧 " + (job.job_number || "Workshop Job");
-    card.appendChild(heading);
-
-    details.slice(1).forEach(detail => {
+    details.forEach(detail => {
       const p = document.createElement("p");
       p.textContent = detail;
       card.appendChild(p);
     });
 
+    const partsHeading = document.createElement("h4");
+    partsHeading.textContent = "Parts used";
+    card.appendChild(partsHeading);
+
+    (job.parts || []).forEach(part => {
+      const p = document.createElement("p");
+      p.textContent =
+        part.item_name + " | " +
+        (part.brand || "") + " | Qty: " +
+        part.quantity;
+      card.appendChild(p);
+    });
+
+    const statusLabel = document.createElement("p");
+    statusLabel.textContent = "Update job status:";
+    card.appendChild(statusLabel);
+
+    const status = document.createElement("select");
+
+    [
+      ["received", "Received"],
+      ["inspection", "Inspection"],
+      ["waiting_parts", "Waiting for Parts"],
+      ["in_service", "In Service"],
+      ["completed", "Completed"]
+    ].forEach(optionData => {
+      const option = document.createElement("option");
+      option.value = optionData[0];
+      option.textContent = optionData[1];
+      status.appendChild(option);
+    });
+
+    status.value = job.status || "received";
+    card.appendChild(status);
+
+    const observationLabel = document.createElement("p");
+    observationLabel.textContent = "Mechanic observations:";
+    card.appendChild(observationLabel);
+
+    const observations = document.createElement("textarea");
+    observations.value = job.mechanic_observations || "";
+    observations.placeholder = "Enter inspection observations";
+    card.appendChild(observations);
+
+    const workLabel = document.createElement("p");
+    workLabel.textContent = "Work performed:";
+    card.appendChild(workLabel);
+
+    const work = document.createElement("textarea");
+    work.value = job.work_performed || "";
+    work.placeholder = "Enter work completed";
+    card.appendChild(work);
+
+    const odometerLabel = document.createElement("p");
+    odometerLabel.textContent = "Odometer reading:";
+    card.appendChild(odometerLabel);
+
+    const odometer = document.createElement("input");
+    odometer.type = "number";
+    odometer.min = "0";
+    odometer.placeholder = "Enter odometer reading";
+    odometer.value = job.odometer || "";
+    card.appendChild(odometer);
+
+    const save = document.createElement("button");
+    save.textContent = "SAVE JOB UPDATE";
+
+    save.onclick = async () => {
+      save.disabled = true;
+      save.textContent = "SAVING...";
+
+      const reading = odometer.value.trim();
+
+      const { error: saveError } = await db.rpc(
+        "update_my_workshop_job",
+        {
+          p_job_card_id: job.id,
+          p_status: status.value,
+          p_mechanic_observations: observations.value,
+          p_work_performed: work.value,
+          p_odometer: reading === "" ? null : Number(reading)
+        }
+      );
+
+      if (saveError) {
+        alert("Update failed: " + saveError.message);
+        save.disabled = false;
+        save.textContent = "SAVE JOB UPDATE";
+        return;
+      }
+
+      alert("Job updated successfully!");
+      await loadMechanicJobs();
+    };
+
+    card.appendChild(save);
     area.appendChild(card);
   });
 }
