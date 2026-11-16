@@ -1,0 +1,3004 @@
+ html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101010">
+<title>Vasu Service Center | Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101010;color:white;font-family:Arial,sans-serif}
+:root{--yellow:#ffd400}
+header{padding:20px;background:#080808;border-bottom:1px solid #333}
+header span{color:var(--yellow)}
+main{max-width:950px;margin:auto;padding:22px}
+.card{background:#1b1b1b;border:1px solid #333;border-radius:10px;padding:20px;margin-bottom:16px}
+h2{margin-top:0}
+input{width:100%;padding:14px;margin:8px 0;background:#101010;color:white;border:1px solid #555;border-radius:5px}
+button{padding:12px 17px;border:0;border-radius:5px;background:var(--yellow);font-weight:bold;cursor:pointer;margin:5px 4px 5px 0}
+.reject{background:#b52b2b;color:white}
+.secondary{background:#444;color:white}
+.small{color:#aaa;font-size:13px}
+.hidden{display:none}
+#message{color:var(--yellow);margin:12px 0}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>VASU <span>SERVICE CENTER</span></h2>
+  <div class="small">OWNER ADMIN DASHBOARD</div>
+</header>
+
+<main>
+
+<div id="login" class="card">
+  <h2>Owner Login 🔐</h2>
+  <input id="email" type="email" placeholder="Owner email">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">LOGIN</button>
+</div>
+
+<div id="dashboard" class="hidden">
+  <div class="card">
+    <h2>Welcome, <span id="ownerName">Owner</span>!</h2>
+    <p>Manage your workshop bookings.</p>
+    <button onclick="loadBookings()">REFRESH BOOKINGS</button>
+    <button class="secondary" onclick="logout()">LOGOUT</button>
+  </div>
+
+  <div class="card">
+  <h2>📥 Booking Management</h2>
+
+  <select id="statusFilter"
+    onchange="loadBookings()"
+    style="width:100%;padding:14px;margin:10px 0;background:#101010;color:white;border:1px solid #ffd400;border-radius:5px;">
+
+    <option value="all">ALL BOOKINGS</option>
+    <option value="pending">PENDING</option>
+    <option value="approved">APPROVED</option>
+    <option value="completed">COMPLETED</option>
+    <option value="rejected">REJECTED</option>
+  </select>
+
+  <div id="bookings">Loading bookings...</div>
+</div>
+  <div class="card">
+  <h2>👥 Customer Management</h2>
+
+  <input
+    id="customerSearch"
+    type="text"
+    placeholder="Search customer by name or mobile..."
+    oninput="loadCustomers()"
+  >
+
+  <button onclick="loadCustomers()">VIEW CUSTOMERS</button>
+
+  <div id="customers">
+    Tap VIEW CUSTOMERS to load customers.
+  </div>
+</div>
+  <div class="card">
+  <h2>🔧 Digital Job Cards</h2>
+
+  <button onclick="loadJobCards()">VIEW JOB CARDS</button>
+  <button onclick="showJobForm()">+ CREATE JOB CARD</button>
+
+  <div id="jobForm" class="hidden">
+    <h3>New Job Card</h3>
+
+    <select id="jobCustomer">
+      <option value="">Select Customer</option>
+    </select>
+
+    <select id="jobBike">
+      <option value="">Select Bike</option>
+    </select>
+
+    <input id="jobOdometer" type="number" placeholder="Odometer (optional)">
+    <input id="jobFuel" placeholder="Fuel level (optional)">
+    <textarea id="jobComplaint" placeholder="Customer complaints"></textarea>
+    <textarea id="jobObservation" placeholder="Mechanic observations"></textarea>
+    <textarea id="jobWork" placeholder="Work performed"></textarea>
+    <input id="jobMechanic" placeholder="Mechanic name">
+    <input id="jobLabour" type="number" placeholder="Labour charges">
+    <input id="jobDiscount" type="number" placeholder="Discount" value="0">
+    <h4>🔩 Spare Parts Used</h4>
+
+<div id="jobPartsContainer"></div>
+
+<button type="button" onclick="addJobPartRow()">
+  + ADD ANOTHER SPARE PART
+</button>
+    <button onclick="saveJobCard()">SAVE JOB CARD</button>
+  </div>
+
+  <div id="jobCards">No job cards loaded.</div>
+    <div class="card">
+  <h3>💰 Record Payment</h3>
+
+  <select id="paymentJobCard">
+    <option value="">Select Job Card</option>
+  </select>
+
+  <p id="paymentSummary">Select a job card to see its balance.</p>
+
+  <input id="paymentAmount" type="number" min="0.01" step="0.01" placeholder="Amount received (₹)">
+
+  <select id="paymentMethod">
+    <option value="">Payment method</option>
+    <option value="cash">Cash</option>
+    <option value="upi">UPI</option>
+    <option value="card">Card</option>
+  </select>
+
+  <input id="paymentReference" placeholder="Transaction reference (optional)">
+
+  <textarea id="paymentNotes" placeholder="Payment notes (optional)"></textarea>
+
+  <button onclick="recordPayment()">RECORD PAYMENT</button>
+
+  <div id="paymentHistory"></div>
+</div>
+</div>
+<div class="card">
+  <h2>📦 Inventory Management</h2>
+
+  <button onclick="loadProducts()">VIEW ALL PRODUCTS</button>
+  <button onclick="showProductForm()">+ ADD PRODUCT</button>
+
+  <input
+    id="productSearch"
+    placeholder="Search product, brand or code..."
+    oninput="loadProducts()"
+  >
+
+  <div id="productForm" class="hidden">
+    <h3>Product Details</h3>
+
+    <input id="productName" placeholder="Product name">
+    <input id="productBrand" placeholder="Brand">
+    
+    <select id="productCategory">
+      <option value="">Select category</option>
+      <option value="Engine Oil">Engine Oil</option>
+      <option value="Chain Cleaner">Chain Cleaner</option>
+      <option value="Chain Lube">Chain Lube</option>
+      <option value="Bike Care">Bike Care</option>
+      <option value="Additives">Additives</option>
+      <option value="Spare Parts">Spare Parts</option>
+      <option value="Accessories">Accessories</option>
+      <option value="Other">Other</option>
+    </select>
+
+    <input id="productCode" placeholder="Product code (optional)">
+    <input id="productPurchase" type="number" min="0" step="0.01" placeholder="Purchase price (₹)">
+    <input id="productSelling" type="number" min="0" step="0.01" placeholder="Selling price (₹)">
+    <input id="productStock" type="number" min="0" step="0.01" placeholder="Opening stock">
+    <input id="productMinimum" type="number" min="0" step="0.01" placeholder="Minimum stock" value="2">
+    <input id="productUnit" placeholder="Unit (piece, litre, bottle)">
+    <textarea id="productNotes" placeholder="Product notes"></textarea>
+
+    <button onclick="saveProduct()">SAVE PRODUCT</button>
+    <button class="secondary" onclick="hideProductForm()">CANCEL</button>
+  </div>
+
+  <div id="products">No products loaded.</div>
+  <hr>
+
+<h3>📊 Inventory History</h3>
+
+<button onclick="loadInventoryHistory()">
+  VIEW INVENTORY HISTORY
+</button>
+
+<div id="inventoryHistory">
+  No history loaded.
+</div>
+</div>
+</div>
+
+<p id="message"></p>
+
+</main>
+
+<script>
+const SUPABASE_URL = "https://mrzeumnbuapspudelgcd.supabase.co";
+const SUPABASE_KEY = "sb_publishable_5kUQeT67fcXErDy8vCyHug_yvJDnMl9";
+
+const db = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+const loginBox = document.getElementById("login");
+const dashboard = document.getElementById("dashboard");
+const message = document.getElementById("message");
+
+let currentUser = null;
+
+function showMessage(text) {
+  message.textContent = text;
+}
+
+async function login() {
+  showMessage("Signing in...");
+
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  const {data,error} = await db.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if(error) {
+    showMessage("Login failed: " + error.message);
+    return;
+  }
+
+  await checkOwner(data.user);
+}
+
+async function checkOwner(user) {
+  if(!user) {
+    showMessage("Please log in.");
+    return;
+  }
+
+  showMessage("Checking account permissions...");
+
+  const {data,error} = await db
+    .from("admin_accounts")
+    .select("id,full_name,role,is_active")
+    .eq("id",user.id)
+    .maybeSingle();
+
+  if(error){
+    showMessage("Account check error: " + error.message);
+    return;
+}
+
+if(!data){
+    showMessage("No admin account found for this login.");
+    return;
+}
+
+if(data.is_active!==true || !["owner","staff"].includes(data.role)){
+    showMessage("Account inactive or role not authorised.");
+    return;
+}
+
+  currentUser = user;
+
+  document.getElementById("ownerName").textContent =
+    data.full_name || "Owner";
+
+  loginBox.classList.add("hidden");
+  dashboard.classList.remove("hidden");
+
+  await loadBookings();
+  await loadPaymentJobCards();
+}
+
+async function loadCustomers() {
+  const area = document.getElementById("customers");
+  const search = document.getElementById("customerSearch").value.trim();
+
+  area.textContent = "Loading customers...";
+
+  let query = db
+    .from("customers")
+    .select("id, full_name, mobile")
+    .order("full_name");
+
+  if (search) {
+    query = query.or(
+      "full_name.ilike.%" + search + "%,mobile.ilike.%" + search + "%"
+    );
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    area.textContent = "Could not load customers: " + error.message;
+    return;
+  }
+
+  area.replaceChildren();
+
+  if (!data || data.length === 0) {
+    area.textContent = "No customers found.";
+    return;
+  }
+
+  data.forEach(customer => {
+  const card = document.createElement("div");
+  card.className = "card";
+
+  const details = document.createElement("p");
+  details.textContent =
+    "Name: " + customer.full_name +
+    "\nMobile: " + customer.mobile;
+
+  details.style.whiteSpace = "pre-line";
+  card.appendChild(details);
+
+  const viewButton = document.createElement("button");
+  viewButton.textContent = "VIEW CUSTOMER PROFILE";
+  viewButton.onclick = () => viewCustomer(customer.id);
+
+  card.appendChild(viewButton);
+  area.appendChild(card);
+});
+}
+  async function viewCustomer(customerId) {
+  const area = document.getElementById("customers");
+
+  const profile = document.createElement("div");
+  profile.className = "card";
+  profile.textContent = "Loading customer profile...";
+
+  area.appendChild(profile);
+
+  const [customerResult, bikeResult, bookingResult] =
+    await Promise.all([
+      db.from("customers")
+        .select("full_name,mobile")
+        .eq("id", customerId)
+        .single(),
+
+      db.from("bikes")
+        .select("brand,model,registration_number")
+        .eq("customer_id", customerId),
+
+      db.from("bookings")
+        .select("booking_date,booking_time,service_requested,status")
+        .eq("customer_id", customerId)
+        .order("booking_date", {ascending:false})
+    ]);
+
+  if (customerResult.error || bikeResult.error || bookingResult.error) {
+    profile.textContent = "Could not load profile. Please check permissions.";
+    return;
+  }
+
+  const customer = customerResult.data;
+  const bikes = bikeResult.data || [];
+  const bookings = bookingResult.data || [];
+
+  profile.replaceChildren();
+
+  const title = document.createElement("h3");
+  title.textContent = "CUSTOMER PROFILE";
+  profile.appendChild(title);
+
+  const details = document.createElement("p");
+  details.textContent =
+    "Name: " + customer.full_name +
+    "\nMobile: " + customer.mobile;
+
+  details.style.whiteSpace = "pre-line";
+  profile.appendChild(details);
+
+  const bikeTitle = document.createElement("h3");
+  bikeTitle.textContent = "🏍️ REGISTERED BIKES";
+  profile.appendChild(bikeTitle);
+
+  const bikeDetails = document.createElement("p");
+  bikeDetails.textContent = bikes.length
+    ? bikes.map(b =>
+        b.brand + " " + b.model +
+        "\nRegistration: " + b.registration_number
+      ).join("\n\n")
+    : "No bikes registered.";
+
+  bikeDetails.style.whiteSpace = "pre-line";
+  profile.appendChild(bikeDetails);
+
+  const historyTitle = document.createElement("h3");
+  historyTitle.textContent = "📋 BOOKING HISTORY";
+  profile.appendChild(historyTitle);
+
+  const history = document.createElement("p");
+  history.textContent = bookings.length
+    ? bookings.map(b =>
+        b.booking_date + " | " + b.booking_time +
+        "\nService: " + b.service_requested +
+        "\nStatus: " + b.status.toUpperCase()
+      ).join("\n\n")
+    : "No booking history.";
+
+  history.style.whiteSpace = "pre-line";
+  profile.appendChild(history);
+
+  const close = document.createElement("button");
+  close.textContent = "CLOSE PROFILE";
+  close.onclick = () => profile.remove();
+  profile.appendChild(close);
+}
+  async function showJobForm() {
+  const form = document.getElementById("jobForm");
+  form.classList.remove("hidden");
+
+  const customerSelect = document.getElementById("jobCustomer");
+  customerSelect.innerHTML = '<option value="">Loading customers...</option>';
+
+  const { data, error } = await db
+    .from("customers")
+    .select("id, full_name, mobile")
+    .order("full_name");
+
+  if (error) {
+    showMessage("Customer loading failed: " + error.message);
+    return;
+  }
+
+  customerSelect.innerHTML = '<option value="">Select Customer</option>';
+
+  data.forEach(customer => {
+    const option = document.createElement("option");
+    option.value = customer.id;
+    option.textContent = customer.full_name + " - " + customer.mobile;
+    customerSelect.appendChild(option);
+  });
+    await loadJobPartProducts();
+}
+let jobPartProducts = [];
+
+async function loadJobPartProducts() {
+  const container = document.getElementById("jobPartsContainer");
+
+  container.replaceChildren();
+
+  const { data, error } = await db
+    .from("products")
+    .select("id, product_name, brand, selling_price, stock_quantity")
+    .gt("stock_quantity", 0)
+    .order("product_name");
+
+  if (error) {
+    showMessage("Could not load spare parts: " + error.message);
+    return;
+  }
+
+  jobPartProducts = data || [];
+
+  addJobPartRow();
+}
+
+function addJobPartRow() {
+  const container = document.getElementById("jobPartsContainer");
+
+  const row = document.createElement("div");
+  row.className = "card";
+
+  const select = document.createElement("select");
+  select.className = "jobPartProduct";
+  select.style.width = "100%";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select Spare Part";
+  select.appendChild(placeholder);
+
+  jobPartProducts.forEach(product => {
+    const option = document.createElement("option");
+    option.value = product.id;
+    option.textContent =
+      product.product_name + " - " +
+      (product.brand || "No brand") +
+      " | ₹" + Number(product.selling_price).toFixed(2) +
+      " | Stock: " + product.stock_quantity;
+
+    select.appendChild(option);
+  });
+
+  const quantity = document.createElement("input");
+  quantity.type = "number";
+  quantity.className = "jobPartQuantity";
+  quantity.min = "1";
+  quantity.step = "1";
+  quantity.value = "1";
+  quantity.placeholder = "Quantity";
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.textContent = "REMOVE";
+  remove.className = "reject";
+  remove.onclick = () => row.remove();
+
+  row.append(select, quantity, remove);
+  container.appendChild(row);
+}
+  
+document.getElementById("jobCustomer").addEventListener("change", async function() {
+  const bikeSelect = document.getElementById("jobBike");
+  bikeSelect.innerHTML = '<option value="">Loading bikes...</option>';
+
+  if (!this.value) {
+    bikeSelect.innerHTML = '<option value="">Select Bike</option>';
+    return;
+  }
+
+  const { data, error } = await db
+    .from("bikes")
+    .select("id, brand, model, registration_number")
+    .eq("customer_id", this.value);
+
+  if (error) {
+    showMessage("Bike loading failed: " + error.message);
+    return;
+  }
+
+  bikeSelect.innerHTML = '<option value="">Select Bike</option>';
+
+  data.forEach(bike => {
+    const option = document.createElement("option");
+    option.value = bike.id;
+    option.textContent =
+      bike.brand + " " + bike.model + " - " + bike.registration_number;
+    bikeSelect.appendChild(option);
+  });
+});
+
+async function saveJobCard() {
+  const customerId = document.getElementById("jobCustomer").value;
+  const bikeId = document.getElementById("jobBike").value;
+
+  const labour = Number(document.getElementById("jobLabour").value || 0);
+  const discount = Number(document.getElementById("jobDiscount").value || 0);
+
+  if (!customerId || !bikeId) {
+    showMessage("Please select a customer and bike.");
+    return;
+  }
+
+  if (
+    !Number.isFinite(labour) ||
+    !Number.isFinite(discount) ||
+    labour < 0 ||
+    discount < 0 ||
+    discount > labour
+  ) {
+    showMessage("Please check labour and discount amounts.");
+    return;
+  }
+
+  const parts = [];
+  const rows = document.querySelectorAll(
+    "#jobPartsContainer > .card"
+  );
+
+  for (const row of rows) {
+    const productId = row.querySelector(".jobPartProduct").value;
+    const quantity = Number(
+      row.querySelector(".jobPartQuantity").value
+    );
+
+    if (!productId) continue;
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      showMessage("Please enter a valid whole-number quantity.");
+      return;
+    }
+
+    parts.push({
+      product_id: productId,
+      quantity: quantity
+    });
+  }
+
+  const jobData = {
+    customer_id: customerId,
+    bike_id: bikeId,
+    odometer: document.getElementById("jobOdometer").value || null,
+    customer_complaint: document.getElementById("jobComplaint").value.trim(),
+    mechanic_observations: document.getElementById("jobObservation").value.trim(),
+    work_performed: document.getElementById("jobWork").value.trim(),
+    mechanic_name: document.getElementById("jobMechanic").value.trim(),
+    labour_charge: labour,
+    discount: discount
+  };
+
+  const button = document.querySelector(
+    '#jobForm button[onclick="saveJobCard()"]'
+  );
+
+  button.disabled = true;
+  button.textContent = "SAVING...";
+
+  const { data, error } = await db.rpc(
+    "create_job_card_with_parts",
+    {
+      p_job_data: jobData,
+      p_parts: parts
+    }
+  );
+
+  button.disabled = false;
+  button.textContent = "SAVE JOB CARD";
+
+  if (error) {
+    showMessage("Job card failed: " + error.message);
+    return;
+  }
+
+  const result = Array.isArray(data) ? data[0] : data;
+
+  showMessage(
+    "Job card created! Number: " + result.job_number +
+    " | Total: ₹" + Number(result.total_amount).toFixed(2)
+  );
+
+  document.querySelectorAll(
+    "#jobForm input, #jobForm select, #jobForm textarea"
+  ).forEach(el => el.value = "");
+
+  document.getElementById("jobDiscount").value = 0;
+
+  document.getElementById("jobForm").classList.add("hidden");
+
+  await loadJobPartProducts();
+  await loadJobCards();
+  await loadPaymentJobCards();
+}
+
+async function loadJobCards() {
+  const area = document.getElementById("jobCards");
+  area.textContent = "Loading job cards...";
+
+  const { data: jobs, error } = await db
+    .from("job_cards")
+    .select(`
+      id,
+      job_number,
+      customer_id,
+      bike_id,
+      status,
+      total_amount,
+      payment_status,
+      received_at,
+      labour_charge,
+      discount,
+      customer_complaint,
+      mechanic_observations,
+      work_performed,
+      mechanic_name
+    `)
+    .order("received_at", { ascending: false });
+
+  if (error) {
+    area.textContent = "Could not load job cards: " + error.message;
+    return;
+  }
+
+  area.replaceChildren();
+
+  if (!jobs || jobs.length === 0) {
+    area.textContent = "No job cards created yet.";
+    return;
+  }
+
+  const customerIds = [...new Set(jobs.map(j => j.customer_id))];
+  const bikeIds = [...new Set(jobs.map(j => j.bike_id))];
+  const jobIds = jobs.map(j => j.id);
+
+  const [customerResult, bikeResult, itemResult] = await Promise.all([
+    db.from("customers")
+      .select("id, full_name, mobile")
+      .in("id", customerIds),
+
+    db.from("bikes")
+      .select("id, brand, model, registration_number")
+      .in("id", bikeIds),
+
+    db.from("job_card_items")
+      .select("job_card_id, item_name, brand, quantity, unit_price, total_price, item_type")
+      .in("job_card_id", jobIds)
+  ]);
+
+  if (customerResult.error || bikeResult.error || itemResult.error) {
+    area.textContent =
+      "Could not load job details: " +
+      (customerResult.error || bikeResult.error || itemResult.error).message;
+    return;
+  }
+
+  const customers = {};
+  (customerResult.data || []).forEach(c => customers[c.id] = c);
+
+  const bikes = {};
+  (bikeResult.data || []).forEach(b => bikes[b.id] = b);
+
+  const items = {};
+  (itemResult.data || []).forEach(item => {
+    if (!items[item.job_card_id]) {
+      items[item.job_card_id] = [];
+    }
+    items[item.job_card_id].push(item);
+  });
+
+  jobs.forEach(job => {
+    const customer = customers[job.customer_id] || {};
+    const bike = bikes[job.bike_id] || {};
+    const parts = items[job.id] || [];
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.style.whiteSpace = "pre-line";
+
+    details.textContent =
+      "JOB NUMBER: " + job.job_number +
+      "\nStatus: " + job.status.toUpperCase() +
+      "\n\nCUSTOMER DETAILS" +
+      "\nName: " + (customer.full_name || "-") +
+      "\nMobile: " + (customer.mobile || "-") +
+      "\n\nBIKE DETAILS" +
+      "\nBike: " + (bike.brand || "") + " " + (bike.model || "") +
+      "\nRegistration: " + (bike.registration_number || "-") +
+      "\n\nCUSTOMER COMPLAINT" +
+      "\n" + (job.customer_complaint || "-") +
+      "\n\nMECHANIC OBSERVATIONS" +
+      "\n" + (job.mechanic_observations || "-") +
+      "\n\nWORK PERFORMED" +
+      "\n" + (job.work_performed || "-") +
+      "\n\nMechanic: " + (job.mechanic_name || "-") +
+      "\n\nLABOUR: ₹" + Number(job.labour_charge || 0).toFixed(2);
+
+    card.appendChild(details);
+
+    const partsHeading = document.createElement("h4");
+    partsHeading.textContent = "🔩 SPARE PARTS";
+    card.appendChild(partsHeading);
+
+    if (parts.length === 0) {
+      const noParts = document.createElement("p");
+      noParts.textContent = "No spare parts added.";
+      card.appendChild(noParts);
+    } else {
+      parts.forEach(part => {
+        const partDetails = document.createElement("p");
+        partDetails.textContent =
+          (part.item_name || "Item") +
+          " (" + (part.brand || "-") + ")" +
+          "\nQuantity: " + part.quantity +
+          "\nUnit price: ₹" + Number(part.unit_price || 0).toFixed(2) +
+          "\nTotal: ₹" + Number(part.total_price || 0).toFixed(2);
+
+        partDetails.style.whiteSpace = "pre-line";
+        card.appendChild(partDetails);
+      });
+    }
+
+    const totalDetails = document.createElement("p");
+    totalDetails.style.whiteSpace = "pre-line";
+    totalDetails.textContent =
+      "\nDiscount: ₹" + Number(job.discount || 0).toFixed(2) +
+      "\nFINAL TOTAL: ₹" + Number(job.total_amount || 0).toFixed(2) +
+      "\nPayment: " + job.payment_status.toUpperCase();
+
+        card.appendChild(totalDetails);
+
+    const statusTitle = document.createElement("h4");
+    statusTitle.textContent = "🔄 UPDATE JOB STATUS";
+    card.appendChild(statusTitle);
+
+    const statusSelect = document.createElement("select");
+    statusSelect.style.width = "100%";
+    statusSelect.style.padding = "12px";
+    statusSelect.style.margin = "8px 0";
+    statusSelect.style.background = "#101010";
+    statusSelect.style.color = "white";
+
+    const statuses = [
+      ["received", "Received"],
+      ["inspection", "Under Inspection"],
+      ["waiting_parts", "Waiting for Parts"],
+      ["in_service", "In Progress"],
+      ["completed", "Completed"],
+      ["delivered", "Delivered"]
+    ];
+
+    statuses.forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      statusSelect.appendChild(option);
+    });
+
+    statusSelect.value = job.status;
+
+    const updateButton = document.createElement("button");
+    updateButton.textContent = "UPDATE STATUS";
+
+    updateButton.onclick = () => {
+      updateJobStatus(job.id, statusSelect.value);
+    };
+
+    card.appendChild(statusSelect);
+    card.appendChild(updateButton);
+
+    const invoiceButton = document.createElement("button");
+    invoiceButton.textContent = "🧾 PRINT INVOICE";
+    invoiceButton.onclick = () =>
+      printJobInvoice(job, customer, bike, parts);
+
+    card.appendChild(invoiceButton);
+    
+    area.appendChild(card);
+  });
+}
+  async function printJobInvoice(job, customer, bike, parts) {
+
+  // Open print window immediately
+  const printWindow = window.open("", "_blank");
+
+  if (!printWindow) {
+    alert("Please allow pop-ups to print the invoice.");
+    return;
+  }
+
+  // Load payment history
+  const { data: payments, error } = await db
+    .from("payments")
+    .select("amount")
+    .eq("job_card_id", job.id);
+
+  if (error) {
+    printWindow.close();
+    alert("Could not load payment details: " + error.message);
+    return;
+  }
+
+  const paid = (payments || []).reduce(
+    (sum, payment) => sum + Number(payment.amount || 0), 0
+  );
+
+  const total = Number(job.total_amount || 0);
+  const balance = Math.max(0, total - paid);
+
+  const escapeHTML = value =>
+    String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[char]);
+
+  const partRows = parts.length
+    ? parts.map(part => `
+        <tr>
+          <td>${escapeHTML(part.item_name)}</td>
+          <td>${escapeHTML(part.brand || "-")}</td>
+          <td>${Number(part.quantity)}</td>
+          <td>₹${Number(part.unit_price).toFixed(2)}</td>
+          <td>₹${Number(part.total_price).toFixed(2)}</td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="5">No spare parts used</td></tr>`;
+
+  const invoiceDate = new Date().toLocaleDateString("en-IN");
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Invoice - Job #${escapeHTML(job.job_number)}</title>
+
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          color: #222;
+          margin: 30px;
+        }
+
+        .header {
+          background: #101010;
+          color: white;
+          padding: 22px;
+          border-bottom: 6px solid #ffd400;
+        }
+
+        .header h1 {
+          margin: 0;
+          font-size: 27px;
+        }
+
+        .yellow {
+          color: #ffd400;
+        }
+
+        .section {
+          margin-top: 25px;
+        }
+
+        .row {
+          display: flex;
+          justify-content: space-between;
+          gap: 20px;
+        }
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 12px;
+        }
+
+        th, td {
+          border: 1px solid #ccc;
+          padding: 10px;
+          text-align: left;
+        }
+
+        th {
+          background: #ffd400;
+          color: #111;
+        }
+
+        .totals {
+          margin-left: auto;
+          width: 300px;
+          margin-top: 20px;
+        }
+
+        .totals p {
+          display: flex;
+          justify-content: space-between;
+        }
+
+        .grand {
+          font-size: 20px;
+          font-weight: bold;
+          border-top: 2px solid #222;
+          padding-top: 10px;
+        }
+
+        .footer {
+          margin-top: 45px;
+          text-align: center;
+          border-top: 1px solid #ccc;
+          padding-top: 15px;
+        }
+
+        @page {
+          size: A4;
+          margin: 12mm;
+        }
+
+        @media print {
+          body { margin: 0; }
+          .no-print { display: none; }
+        }
+      </style>
+    </head>
+
+    <body>
+
+      <div class="header">
+        <h1>VASU <span class="yellow">SERVICE CENTER</span></h1>
+        <p>Two-Wheeler Service & Care</p>
+        <p>Motorcycles | Scooters</p>
+      </div>
+
+      <div class="row section">
+        <div>
+          <h2>INVOICE</h2>
+          <p><b>Job Number:</b> ${escapeHTML(job.job_number)}</p>
+          <p><b>Invoice Date:</b> ${invoiceDate}</p>
+        </div>
+
+        <div>
+          <h3>Customer Details</h3>
+          <p>${escapeHTML(customer.full_name)}</p>
+          <p>Mobile: ${escapeHTML(customer.mobile)}</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Bike Details</h3>
+        <p>
+          ${escapeHTML(bike.brand)} ${escapeHTML(bike.model)}
+        </p>
+        <p>Registration: ${escapeHTML(bike.registration_number)}</p>
+      </div>
+
+      <div class="section">
+        <h3>Service Details</h3>
+        <p><b>Complaint:</b> ${escapeHTML(job.customer_complaint || "-")}</p>
+        <p><b>Observations:</b> ${escapeHTML(job.mechanic_observations || "-")}</p>
+        <p><b>Work Performed:</b> ${escapeHTML(job.work_performed || "-")}</p>
+        <p><b>Mechanic:</b> ${escapeHTML(job.mechanic_name || "-")}</p>
+      </div>
+
+      <div class="section">
+        <h3>Spare Parts</h3>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Brand</th>
+              <th>Qty</th>
+              <th>Unit Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${partRows}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="totals">
+        <p>
+          <span>Labour:</span>
+          <b>₹${Number(job.labour_charge || 0).toFixed(2)}</b>
+        </p>
+
+        <p>
+          <span>Discount:</span>
+          <b>₹${Number(job.discount || 0).toFixed(2)}</b>
+        </p>
+
+        <p class="grand">
+          <span>Grand Total:</span>
+          <span>₹${total.toFixed(2)}</span>
+        </p>
+
+        <p>
+          <span>Amount Paid:</span>
+          <b>₹${paid.toFixed(2)}</b>
+        </p>
+
+        <p>
+          <span>Balance Due:</span>
+          <b>₹${balance.toFixed(2)}</b>
+        </p>
+      </div>
+
+      <div class="footer">
+        <h3>Thank You!</h3>
+        <p>Thank you for choosing Vasu Service Center.</p>
+        <p>Ride Safe. Ride Smooth.</p>
+      </div>
+
+      <button class="no-print" onclick="window.print()">
+        PRINT / SAVE AS PDF
+      </button>
+
+    </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+}
+  async function updateJobStatus(jobId, newStatus) {
+
+  const allowedStatuses = [
+    "received",
+    "inspection",
+    "waiting_parts",
+    "in_service",
+    "completed",
+    "delivered"
+  ];
+
+  if (!allowedStatuses.includes(newStatus)) {
+    alert("Invalid job status.");
+    return;
+  }
+
+  if (!confirm("Change job status to " + newStatus + "?")) {
+    return;
+  }
+
+  const { error } = await db
+    .from("job_cards")
+    .update({ status: newStatus })
+    .eq("id", jobId);
+
+  if (error) {
+    alert("Status update failed: " + error.message);
+    return;
+  }
+
+  alert("Job status updated successfully!");
+
+  await loadJobCards();
+}
+  // LOAD JOB CARDS INTO PAYMENT DROPDOWN
+async function loadPaymentJobCards() {
+  const select = document.getElementById("paymentJobCard");
+
+  select.innerHTML = '<option value="">Select Job Card</option>';
+
+  const { data, error } = await db
+    .from("job_cards")
+    .select("id, job_number, total_amount")
+    .order("received_at", { ascending: false });
+
+  if (error) {
+    document.getElementById("paymentSummary").textContent =
+      "Could not load job cards: " + error.message;
+    return;
+  }
+
+  data.forEach(job => {
+    const option = document.createElement("option");
+    option.value = job.id;
+    option.textContent = "Job #" + job.job_number;
+    select.appendChild(option);
+  });
+}
+
+// SHOW PAYMENT SUMMARY AND HISTORY
+async function loadPaymentDetails(jobId) {
+  const summary = document.getElementById("paymentSummary");
+  const history = document.getElementById("paymentHistory");
+
+  if (!jobId) {
+    summary.textContent = "Select a job card to see its balance.";
+    history.replaceChildren();
+    return;
+  }
+
+  const { data: job, error: jobError } = await db
+    .from("job_cards")
+    .select("total_amount")
+    .eq("id", jobId)
+    .single();
+
+  if (jobError) {
+    summary.textContent = jobError.message;
+    return;
+  }
+
+  const { data: payments, error } = await db
+    .from("payments")
+    .select("id, amount, payment_method, payment_date, transaction_reference, notes")
+    .eq("job_card_id", jobId)
+    .order("payment_date", { ascending: false });
+
+  if (error) {
+    summary.textContent = "Could not load payments: " + error.message;
+    return;
+  }
+
+  const paid = payments.reduce(
+    (sum, payment) => sum + Number(payment.amount), 0
+  );
+
+  const total = Number(job.total_amount || 0);
+  const balance = total - paid;
+
+  summary.textContent =
+    "Total: ₹" + total.toFixed(2) +
+    " | Paid: ₹" + paid.toFixed(2) +
+    " | Balance: ₹" + balance.toFixed(2);
+
+  history.replaceChildren();
+
+  const heading = document.createElement("h4");
+  heading.textContent = "Payment History";
+  history.appendChild(heading);
+
+  if (payments.length === 0) {
+    history.append("No payments recorded yet.");
+    return;
+  }
+
+  payments.forEach(payment => {
+  const paymentCard = document.createElement("div");
+  paymentCard.className = "card";
+
+  const item = document.createElement("p");
+  item.textContent =
+    "Amount: ₹" + Number(payment.amount).toFixed(2) +
+    "\nMethod: " + payment.payment_method.toUpperCase() +
+    "\nDate: " + new Date(payment.payment_date).toLocaleString() +
+    (payment.transaction_reference
+      ? "\nReference: " + payment.transaction_reference
+      : "");
+
+  item.style.whiteSpace = "pre-line";
+
+  const receiptButton = document.createElement("button");
+  receiptButton.textContent = "🧾 PRINT RECEIPT";
+  receiptButton.onclick = () =>
+    printPaymentReceipt(payment, jobId);
+
+  paymentCard.appendChild(item);
+  paymentCard.appendChild(receiptButton);
+  history.appendChild(paymentCard);
+});
+}
+async function printPaymentReceipt(payment, jobId) {
+
+  const printWindow = window.open("", "_blank");
+
+  if (!printWindow) {
+    alert("Please allow pop-ups to print receipts.");
+    return;
+  }
+
+  const [jobResult, paymentsResult] = await Promise.all([
+    db.from("job_cards")
+      .select("job_number, total_amount, customer_id, bike_id")
+      .eq("id", jobId)
+      .single(),
+
+    db.from("payments")
+      .select("id, amount, payment_date")
+      .eq("job_card_id", jobId)
+      .order("payment_date", { ascending: true })
+  ]);
+
+  if (jobResult.error || paymentsResult.error) {
+    printWindow.close();
+    alert("Could not load receipt details.");
+    return;
+  }
+
+  const job = jobResult.data;
+  const payments = paymentsResult.data || [];
+
+  const [customerResult, bikeResult] = await Promise.all([
+    db.from("customers")
+      .select("full_name, mobile")
+      .eq("id", job.customer_id)
+      .single(),
+
+    db.from("bikes")
+      .select("brand, model, registration_number")
+      .eq("id", job.bike_id)
+      .single()
+  ]);
+
+  if (customerResult.error || bikeResult.error) {
+    printWindow.close();
+    alert("Could not load customer or bike details.");
+    return;
+  }
+
+  const customer = customerResult.data;
+  const bike = bikeResult.data;
+
+  const paymentIndex = payments.findIndex(
+    p => p.id === payment.id
+  );
+
+  if (paymentIndex === -1) {
+    printWindow.close();
+    alert("Payment record not found.");
+    return;
+  }
+
+  const previousPaid = payments
+    .slice(0, paymentIndex)
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const amount = Number(payment.amount);
+  const total = Number(job.total_amount || 0);
+  const paidAfter = previousPaid + amount;
+  const balance = Math.max(0, total - paidAfter);
+
+  const escapeHTML = value =>
+    String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[char]);
+
+  const receiptNumber =
+    "VSC-" + String(payment.id).slice(0, 8).toUpperCase();
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Receipt ${receiptNumber}</title>
+
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          color: #222;
+          margin: 30px;
+        }
+
+        .header {
+          background: #101010;
+          color: white;
+          padding: 22px;
+          border-bottom: 6px solid #ffd400;
+        }
+
+        .header h1 {
+          margin: 0;
+        }
+
+        .yellow {
+          color: #ffd400;
+        }
+
+        .section {
+          margin-top: 25px;
+        }
+
+        .box {
+          border: 1px solid #ccc;
+          padding: 18px;
+          margin-top: 20px;
+        }
+
+        .amount {
+          font-size: 28px;
+          font-weight: bold;
+          text-align: center;
+          margin: 25px 0;
+        }
+
+        .row {
+          display: flex;
+          justify-content: space-between;
+          gap: 15px;
+          margin: 12px 0;
+        }
+
+        .footer {
+          text-align: center;
+          border-top: 1px solid #ccc;
+          padding-top: 20px;
+          margin-top: 40px;
+        }
+
+        @page {
+          size: A4;
+          margin: 12mm;
+        }
+
+        @media print {
+          body { margin: 0; }
+          .no-print { display: none; }
+        }
+      </style>
+    </head>
+
+    <body>
+
+      <div class="header">
+        <h1>VASU <span class="yellow">SERVICE CENTER</span></h1>
+        <p>Two-Wheeler Service & Care</p>
+      </div>
+
+      <div class="section">
+        <h2>PAYMENT RECEIPT</h2>
+        <p><b>Receipt No:</b> ${receiptNumber}</p>
+        <p><b>Date:</b> ${new Date(payment.payment_date).toLocaleString("en-IN")}</p>
+        <p><b>Job Number:</b> ${escapeHTML(job.job_number)}</p>
+      </div>
+
+      <div class="section">
+        <h3>Customer Details</h3>
+        <p>${escapeHTML(customer.full_name)}</p>
+        <p>Mobile: ${escapeHTML(customer.mobile)}</p>
+
+        <h3>Bike Details</h3>
+        <p>${escapeHTML(bike.brand)} ${escapeHTML(bike.model)}</p>
+        <p>Registration: ${escapeHTML(bike.registration_number)}</p>
+      </div>
+
+      <div class="box">
+        <h3>Payment Details</h3>
+
+        <div class="amount">
+          ₹${amount.toFixed(2)}
+        </div>
+
+        <div class="row">
+          <span>Payment Method:</span>
+          <b>${escapeHTML(payment.payment_method.toUpperCase())}</b>
+        </div>
+
+        <div class="row">
+          <span>Previous Amount Paid:</span>
+          <b>₹${previousPaid.toFixed(2)}</b>
+        </div>
+
+        <div class="row">
+          <span>This Payment:</span>
+          <b>₹${amount.toFixed(2)}</b>
+        </div>
+
+        <div class="row">
+          <span>Total Paid:</span>
+          <b>₹${paidAfter.toFixed(2)}</b>
+        </div>
+
+        <div class="row">
+          <span>Job Total:</span>
+          <b>₹${total.toFixed(2)}</b>
+        </div>
+
+        <div class="row">
+          <span>Remaining Balance:</span>
+          <b>₹${balance.toFixed(2)}</b>
+        </div>
+
+        ${payment.transaction_reference
+          ? `<p>Reference: ${escapeHTML(payment.transaction_reference)}</p>`
+          : ""}
+      </div>
+
+      <div class="footer">
+        <h3>Payment Received. Thank You!</h3>
+        <p>Thank you for choosing Vasu Service Center.</p>
+        <p>Ride Safe. Ride Smooth.</p>
+      </div>
+
+      <button class="no-print" onclick="window.print()">
+        PRINT / SAVE AS PDF
+      </button>
+
+    </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+}
+// RECORD PAYMENT
+async function recordPayment() {
+  const jobId = document.getElementById("paymentJobCard").value;
+  const amount = Number(document.getElementById("paymentAmount").value);
+  const method = document.getElementById("paymentMethod").value;
+
+  if (!jobId) {
+    alert("Please select a job card.");
+    return;
+  }
+
+  if (!amount || amount <= 0) {
+    alert("Enter a valid payment amount.");
+    return;
+  }
+
+  if (!method) {
+    alert("Please select a payment method.");
+    return;
+  }
+
+  const button = document.querySelector(
+    'button[onclick="recordPayment()"]'
+  );
+
+  button.disabled = true;
+  button.textContent = "RECORDING...";
+
+  const { data, error } = await db.rpc("record_job_payment", {
+    p_job_card_id: jobId,
+    p_amount: amount,
+    p_payment_method: method,
+    p_transaction_reference:
+      document.getElementById("paymentReference").value.trim() || null,
+    p_notes:
+      document.getElementById("paymentNotes").value.trim() || null
+  });
+
+  button.disabled = false;
+  button.textContent = "RECORD PAYMENT";
+
+  if (error) {
+    alert("Payment failed: " + error.message);
+    return;
+  }
+
+  const result = Array.isArray(data) ? data[0] : data;
+
+  alert(
+    "Payment recorded successfully!\n" +
+    "Total paid: ₹" + Number(result.paid_amount).toFixed(2) +
+    "\nRemaining balance: ₹" +
+    Number(result.balance_amount).toFixed(2) +
+    "\nStatus: " + result.new_payment_status
+  );
+
+  document.getElementById("paymentAmount").value = "";
+  document.getElementById("paymentMethod").value = "";
+  document.getElementById("paymentReference").value = "";
+  document.getElementById("paymentNotes").value = "";
+
+  await loadPaymentDetails(jobId);
+  await loadJobCards();
+}
+
+// PAYMENT DROPDOWN EVENTS
+document.getElementById("paymentJobCard").addEventListener(
+  "focus",
+  loadPaymentJobCards
+);
+
+document.getElementById("paymentJobCard").addEventListener(
+  "change",
+  function () {
+    loadPaymentDetails(this.value);
+  }
+);
+  // INVENTORY MANAGEMENT
+
+function showProductForm() {
+  document.getElementById("productForm").classList.remove("hidden");
+}
+
+function hideProductForm() {
+  document.getElementById("productForm").classList.add("hidden");
+}
+
+async function loadProducts() {
+  const area = document.getElementById("products");
+  const search = document.getElementById("productSearch").value.trim();
+
+  area.textContent = "Loading products...";
+
+  let query = db
+    .from("products")
+    .select("*")
+    .order("product_name");
+
+  if (search) {
+    query = query.or(
+      "product_name.ilike.%" + search +
+      "%,brand.ilike.%" + search +
+      "%,product_code.ilike.%" + search + "%"
+    );
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    area.textContent = "Could not load products: " + error.message;
+    return;
+  }
+
+  area.replaceChildren();
+
+  if (!data || data.length === 0) {
+    area.textContent = "No products found.";
+    return;
+  }
+
+  data.forEach(product => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.style.whiteSpace = "pre-line";
+    details.textContent =
+      product.product_name +
+      "\nBrand: " + (product.brand || "-") +
+      "\nCode: " + (product.product_code || "-") +
+      "\nStock: " + product.stock_quantity +
+      "\nSelling Price: ₹" + product.selling_price +
+      "\nMinimum Stock: " + product.minimum_stock;
+
+    card.appendChild(details);
+
+if (Number(product.stock_quantity) <= Number(product.minimum_stock)) {
+  const warning = document.createElement("p");
+  warning.textContent = "⚠️ LOW STOCK";
+  warning.style.color = "#ffd400";
+  card.appendChild(warning);
+}
+
+const stockIn = document.createElement("button");
+stockIn.textContent = "STOCK IN";
+stockIn.onclick = () => changeStock(product.id, "purchase");
+
+const stockOut = document.createElement("button");
+stockOut.textContent = "STOCK OUT";
+stockOut.className = "secondary";
+stockOut.onclick = () => {
+  const type = prompt("Enter 'sale' for sold or 'used' for workshop use:");
+  if (type && ["sale", "used"].includes(type.trim().toLowerCase())) {
+    changeStock(product.id, type);
+  }
+};
+
+card.appendChild(stockIn);
+card.appendChild(stockOut);
+area.appendChild(card);
+  });
+}
+
+async function saveProduct() {
+  const product = {
+    product_name: document.getElementById("productName").value.trim(),
+    brand: document.getElementById("productBrand").value.trim(),
+    category: document.getElementById("productCategory").value,
+    product_code: document.getElementById("productCode").value.trim(),
+    purchase_price: Number(document.getElementById("productPurchase").value || 0),
+    selling_price: Number(document.getElementById("productSelling").value || 0),
+    stock_quantity: Number(document.getElementById("productStock").value || 0),
+    minimum_stock: Number(document.getElementById("productMinimum").value || 2),
+    unit: document.getElementById("productUnit").value.trim(),
+    notes: document.getElementById("productNotes").value.trim()
+  };
+
+  if (!product.product_name || !product.category) {
+    alert("Enter product name and select a category.");
+    return;
+  }
+
+  if (
+    product.purchase_price < 0 ||
+    product.selling_price < 0 ||
+    product.stock_quantity < 0 ||
+    product.minimum_stock < 0
+  ) {
+    alert("Prices and stock quantities cannot be negative.");
+    return;
+  }
+
+  const { error } = await db
+    .from("products")
+    .insert(product);
+
+  if (error) {
+    alert("Could not save product: " + error.message);
+    return;
+  }
+
+  alert("Product added successfully!");
+
+  document.querySelectorAll("#productForm input, #productForm select, #productForm textarea").forEach(field => field.value = "");
+  hideProductForm();
+  await loadProducts();
+}
+
+  async function changeStock(productId, movementType) {
+  const quantity = Number(prompt("Enter quantity:"));
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    alert("Enter a valid quantity.");
+    return;
+  }
+
+  const { error } = await db.rpc("update_product_stock", {
+    p_product_id: productId,
+    p_quantity: quantity,
+    p_movement_type: movementType
+  });
+
+  if (error) {
+    alert("Stock update failed: " + error.message);
+    return;
+  }
+
+  alert("Stock updated successfully!");
+  await loadProducts();
+}
+  async function loadInventoryHistory() {
+  const area = document.getElementById("inventoryHistory");
+  area.textContent = "Loading inventory history...";
+
+  const { data, error } = await db
+    .from("inventory_movements")
+    .select("id, product_id, movement_type, quantity, reference, notes, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    area.textContent = "Could not load history: " + error.message;
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    area.textContent = "No inventory history yet.";
+    return;
+  }
+
+  const { data: products, error: productError } = await db
+    .from("products")
+    .select("id, product_name, brand");
+
+  if (productError) {
+    area.textContent = "Could not load product names: " + productError.message;
+    return;
+  }
+
+  const productMap = {};
+  products.forEach(p => {
+    productMap[p.id] = p;
+  });
+
+  area.replaceChildren();
+
+  data.forEach(item => {
+    const product = productMap[item.product_id];
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.style.whiteSpace = "pre-line";
+
+    details.textContent =
+      "Product: " + (product ? product.product_name : "Unknown") +
+      "\nBrand: " + (product?.brand || "-") +
+      "\nMovement: " + item.movement_type +
+      "\nQuantity: " + item.quantity +
+      "\nDate: " + new Date(item.created_at).toLocaleString("en-IN") +
+      "\nReference: " + (item.reference || "-") +
+      "\nNotes: " + (item.notes || "-");
+
+    card.appendChild(details);
+    area.appendChild(card);
+  });
+}
+  async function loadBookings(){
+  const area = document.getElementById("bookings");
+  area.textContent = "Loading bookings...";
+
+  let query = db
+  .from("bookings")
+  .select(`
+    id,
+    booking_date,
+    booking_time,
+    service_requested,
+    status,
+    customer_notes,
+    created_at,
+    customers(full_name, mobile),
+    bikes(registration_number, brand, model)
+  `)
+  .order("created_at", {ascending:false});
+
+const filter = document.getElementById("statusFilter").value;
+
+if(filter !== "all"){
+  query = query.eq("status", filter);
+}
+
+const {data, error} = await query;
+
+  if(error){
+    area.textContent = "Could not load bookings: " + error.message;
+    return;
+  }
+
+  area.replaceChildren();
+
+  if(!data || data.length === 0){
+    area.textContent = "No bookings received yet.";
+    return;
+  }
+
+  data.forEach(booking => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const customer = booking.customers || {};
+    const bike = booking.bikes || {};
+
+    const details = document.createElement("p");
+
+    details.textContent =
+      "CUSTOMER DETAILS\n" +
+      "Name: " + (customer.full_name || "Not available") + "\n" +
+      "Mobile: " + (customer.mobile || "Not available") + "\n\n" +
+
+      "BIKE DETAILS\n" +
+      "Brand: " + (bike.brand || "Not available") + "\n" +
+      "Model: " + (bike.model || "Not available") + "\n" +
+      "Registration: " + (bike.registration_number || "Not available") + "\n\n" +
+
+      "BOOKING DETAILS\n" +
+      "Service: " + booking.service_requested + "\n" +
+      "Date: " + booking.booking_date + "\n" +
+      "Time: " + booking.booking_time + "\n" +
+      "Status: " + booking.status.toUpperCase() + "\n" +
+      "Notes: " + (booking.customer_notes || "None");
+
+    details.style.whiteSpace = "pre-line";
+    card.appendChild(details);
+
+    if(booking.status === "pending"){
+  const approve = document.createElement("button");
+  approve.textContent = "APPROVE";
+  approve.onclick = () => updateBooking(booking.id, "approved");
+
+  const reject = document.createElement("button");
+  reject.textContent = "REJECT";
+  reject.className = "reject";
+  reject.onclick = () => updateBooking(booking.id, "rejected");
+
+  card.append(approve, reject);
+}
+
+if(booking.status === "approved"){
+
+  // WhatsApp confirmation button
+  const whatsapp = document.createElement("button");
+  whatsapp.textContent = "SEND WHATSAPP CONFIRMATION";
+
+  whatsapp.onclick = () => {
+    const phone = (customer.mobile || "").replace(/\D/g, "");
+
+    if(!phone){
+      alert("Customer mobile number not available.");
+      return;
+    }
+
+    const whatsappNumber =
+      phone.length === 10 ? "91" + phone : phone;
+
+    const bookingMessage =
+      "Hello " + (customer.full_name || "Customer") + "!\n\n" +
+      "Your booking at VASU SERVICE CENTER has been APPROVED! ✅\n\n" +
+      "🏍️ Bike: " + (bike.brand || "") + " " + (bike.model || "") + "\n" +
+      "Registration: " + (bike.registration_number || "") + "\n" +
+      "Service: " + booking.service_requested + "\n" +
+      "Date: " + booking.booking_date + "\n" +
+      "Time: " + booking.booking_time + "\n\n" +
+      "Thank you for choosing Vasu Service Center!";
+
+    const whatsappURL =
+      "https://wa.me/" + whatsappNumber +
+      "?text=" + encodeURIComponent(bookingMessage);
+
+    window.open(whatsappURL, "_blank");
+  };
+
+  card.appendChild(whatsapp);
+
+  // Mark completed button
+  const complete = document.createElement("button");
+  complete.textContent = "MARK COMPLETED";
+  complete.onclick = () => updateBooking(booking.id, "completed");
+
+  card.appendChild(complete);
+}
+
+    area.appendChild(card);
+  });
+}
+
+async function updateBooking(id,status) {
+  if(!confirm("Change booking status to " + status + "?")) return;
+
+  const {error} = await db
+    .from("bookings")
+    .update({status})
+    .eq("id",id);
+
+  if(error) {
+    showMessage("Update failed: " + error.message);
+    return;
+  }
+
+  showMessage("Booking updated successfully.");
+  await loadBookings();
+}
+
+async function logout() {
+  await db.auth.signOut();
+  currentUser = null;
+  dashboard.classList.add("hidden");
+  loginBox.classList.remove("hidden");
+  showMessage("Logged out.");
+}
+// ===================================
+// VASU SERVICE CENTER - EXPENSE MANAGER
+// ===================================
+
+function installExpenseSection() {
+  if (document.getElementById("expenseSection")) return;
+
+  const inventoryCard = document.getElementById("products").closest(".card");
+
+  const section = document.createElement("div");
+  section.className = "card";
+  section.id = "expenseSection";
+
+  section.innerHTML = `
+    <h2>💰 EXPENSES & PROFIT TRACKER</h2>
+
+    <h3>➕ Add New Expense</h3>
+
+    <select id="expenseCategory"
+      style="width:100%;padding:14px;margin:8px 0;background:#101010;color:white;border:1px solid #555;border-radius:5px;">
+      <option value="">Select expense category</option>
+      <option value="Rent">Rent</option>
+      <option value="Salaries">Salaries</option>
+      <option value="Electricity">Electricity</option>
+      <option value="Spare Parts Purchase">Spare Parts Purchase</option>
+      <option value="Tools & Equipment">Tools & Equipment</option>
+      <option value="Maintenance">Maintenance</option>
+      <option value="Transport">Transport</option>
+      <option value="Food & Refreshments">Food & Refreshments</option>
+      <option value="Other">Other</option>
+    </select>
+
+    <input id="expenseAmount" type="number"
+      min="0.01" step="0.01" placeholder="Amount (₹)">
+
+    <input id="expenseDescription"
+      placeholder="Description (optional)">
+
+    <select id="expenseMethod"
+      style="width:100%;padding:14px;margin:8px 0;background:#101010;color:white;border:1px solid #555;border-radius:5px;">
+      <option value="cash">Cash</option>
+      <option value="upi">UPI</option>
+      <option value="card">Card</option>
+      <option value="bank">Bank Transfer</option>
+    </select>
+
+    <input id="expenseDate" type="date">
+
+    <button id="saveExpenseButton" onclick="saveExpense()">
+      SAVE EXPENSE
+    </button>
+
+    <hr>
+
+    <h3>📊 Financial Overview</h3>
+
+    <button onclick="loadExpenses()">REFRESH REPORT</button>
+
+    <div id="expenseSummary">
+      Tap REFRESH REPORT to view your financial summary.
+    </div>
+
+    <hr>
+
+    <h3>📋 Recent Expenses</h3>
+    <div id="expenseHistory">No expenses loaded.</div>
+  `;
+
+  inventoryCard.insertAdjacentElement("afterend", section);
+
+  document.getElementById("expenseDate").value =
+    new Date().toLocaleDateString("en-CA");
+}
+
+async function saveExpense() {
+  const category = document.getElementById("expenseCategory").value;
+  const amount = Number(document.getElementById("expenseAmount").value);
+  const description =
+    document.getElementById("expenseDescription").value.trim();
+  const method = document.getElementById("expenseMethod").value;
+  const date = document.getElementById("expenseDate").value;
+
+  if (!category || !date || !Number.isFinite(amount) || amount <= 0) {
+    alert("Please enter a category, valid amount and date.");
+    return;
+  }
+
+  const button = document.getElementById("saveExpenseButton");
+  button.disabled = true;
+  button.textContent = "SAVING...";
+
+  const { error } = await db.from("expenses").insert({
+    category: category,
+    amount: amount,
+    description: description || null,
+    payment_method: method,
+    expense_date: date,
+    created_by: currentUser ? currentUser.id : null
+  });
+
+  button.disabled = false;
+  button.textContent = "SAVE EXPENSE";
+
+  if (error) {
+    alert("Expense saving failed: " + error.message);
+    return;
+  }
+
+  alert("Expense saved successfully!");
+
+  document.getElementById("expenseCategory").value = "";
+  document.getElementById("expenseAmount").value = "";
+  document.getElementById("expenseDescription").value = "";
+
+  await loadExpenses();
+}
+
+async function loadExpenses() {
+  const summary = document.getElementById("expenseSummary");
+  const history = document.getElementById("expenseHistory");
+
+  summary.textContent = "Calculating financial report...";
+  history.textContent = "Loading expenses...";
+
+  const [expenseResult, paymentResult] = await Promise.all([
+    db.from("expenses")
+      .select("id,category,amount,description,payment_method,expense_date,created_at")
+      .order("expense_date", { ascending: false }),
+
+    db.from("payments")
+      .select("amount,payment_date")
+  ]);
+
+  if (expenseResult.error || paymentResult.error) {
+    summary.textContent =
+      "Report error: " +
+      (expenseResult.error || paymentResult.error).message;
+    history.textContent = "Could not load records.";
+    return;
+  }
+
+  const expenses = expenseResult.data || [];
+  const payments = paymentResult.data || [];
+
+  const now = new Date();
+
+  const today = now.toLocaleDateString("en-CA");
+  const month = today.slice(0, 7);
+
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  weekStart.setHours(0, 0, 0, 0);
+
+  const weekDate = weekStart.toLocaleDateString("en-CA");
+
+  const todayExpenses = expenses
+    .filter(e => e.expense_date === today)
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const weekExpenses = expenses
+    .filter(e => e.expense_date >= weekDate && e.expense_date <= today)
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const monthExpenses = expenses
+    .filter(e => e.expense_date.startsWith(month))
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const todayIncome = payments
+    .filter(p => p.payment_date &&
+      new Date(p.payment_date).toLocaleDateString("en-CA") === today)
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const monthIncome = payments
+    .filter(p => p.payment_date &&
+      new Date(p.payment_date).toLocaleDateString("en-CA").startsWith(month))
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const todayBalance = todayIncome - todayExpenses;
+  const monthBalance = monthIncome - monthExpenses;
+
+  summary.innerHTML = `
+    <div class="card">
+      <h3>📅 TODAY</h3>
+      <p>Money received: ₹${todayIncome.toFixed(2)}</p>
+      <p>Expenses: ₹${todayExpenses.toFixed(2)}</p>
+      <h3>Net: ₹${todayBalance.toFixed(2)}</h3>
+    </div>
+
+    <div class="card">
+      <h3>📆 THIS WEEK</h3>
+      <p>Expenses: ₹${weekExpenses.toFixed(2)}</p>
+    </div>
+
+    <div class="card">
+      <h3>📊 THIS MONTH</h3>
+      <p>Money received: ₹${monthIncome.toFixed(2)}</p>
+      <p>Expenses: ₹${monthExpenses.toFixed(2)}</p>
+      <h3>Net: ₹${monthBalance.toFixed(2)}</h3>
+    </div>
+
+    <p class="small">
+      Net = recorded customer payments received minus recorded expenses.
+      This is not a complete accounting profit calculation.
+    </p>
+  `;
+
+  history.replaceChildren();
+
+  if (expenses.length === 0) {
+    history.textContent = "No expenses recorded yet.";
+    return;
+  }
+
+  expenses.slice(0, 30).forEach(expense => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.style.whiteSpace = "pre-line";
+
+    details.textContent =
+      "Category: " + expense.category +
+      "\nAmount: ₹" + Number(expense.amount).toFixed(2) +
+      "\nDate: " + expense.expense_date +
+      "\nMethod: " + expense.payment_method.toUpperCase() +
+      "\nDescription: " + (expense.description || "-");
+
+    card.appendChild(details);
+    history.appendChild(card);
+  });
+}
+
+// Install the section automatically.
+installExpenseSection();
+  
+// ===========================================
+// VASU SERVICE CENTER - PRODUCT SALES & BILLING
+// ===========================================
+
+function installSalesSection() {
+  if (document.getElementById("salesSection")) return;
+
+  const inventory = document.getElementById("products").closest(".card");
+
+  const section = document.createElement("div");
+  section.className = "card";
+  section.id = "salesSection";
+
+  section.innerHTML = `
+    <h2>🛒 PRODUCT SALES & BILLING</h2>
+
+    <h3>Customer Details</h3>
+    <input id="saleCustomerName" placeholder="Customer name (optional)">
+    <input id="saleCustomerMobile" placeholder="Mobile number (optional)">
+
+    <h3>Products</h3>
+    <div id="salesProductRows"></div>
+
+    <button type="button" onclick="addSalesProductRow()">
+      + ADD PRODUCT
+    </button>
+
+    <input id="saleDiscount" type="number" min="0"
+      step="0.01" placeholder="Discount (₹)" value="0">
+
+    <select id="salePaymentMethod">
+      <option value="cash">Cash</option>
+      <option value="upi">UPI</option>
+      <option value="card">Card</option>
+      <option value="bank">Bank Transfer</option>
+    </select>
+
+    <button onclick="saveProductSale()" id="saveSaleButton">
+      COMPLETE SALE & GENERATE BILL
+    </button>
+
+    <div id="saleMessage"></div>
+
+    <hr>
+
+    <h3>📊 Sales Summary</h3>
+    <button onclick="loadSalesHistory()">REFRESH SALES REPORT</button>
+    <div id="salesSummary"></div>
+
+    <hr>
+
+    <h3>📋 Recent Sales</h3>
+    <div id="salesHistory">No sales loaded.</div>
+  `;
+
+  inventory.insertAdjacentElement("afterend", section);
+  addSalesProductRow();
+}
+
+let salesProducts = [];
+
+async function loadSalesProducts() {
+  const { data, error } = await db
+    .from("products")
+    .select("id,product_name,brand,selling_price,purchase_price,stock_quantity")
+    .gt("stock_quantity", 0)
+    .order("product_name");
+
+  if (error) {
+    alert("Product loading failed: " + error.message);
+    return;
+  }
+
+  salesProducts = data || [];
+  const rows = document.querySelectorAll(".salesProductSelect");
+
+  rows.forEach(select => {
+    const previous = select.value;
+    select.innerHTML = '<option value="">Select Product</option>';
+
+    salesProducts.forEach(product => {
+      const option = document.createElement("option");
+      option.value = product.id;
+      option.textContent =
+        product.product_name + " - " +
+        (product.brand || "") +
+        " | ₹" + Number(product.selling_price).toFixed(2) +
+        " | Stock: " + product.stock_quantity;
+
+      select.appendChild(option);
+    });
+
+    select.value = previous;
+  });
+}
+
+function addSalesProductRow() {
+  const container = document.getElementById("salesProductRows");
+
+  const row = document.createElement("div");
+  row.className = "card";
+
+  const select = document.createElement("select");
+  select.className = "salesProductSelect";
+  select.style.width = "100%";
+  select.style.padding = "12px";
+  select.style.background = "#101010";
+  select.style.color = "white";
+
+  select.innerHTML = '<option value="">Loading products...</option>';
+
+  const quantity = document.createElement("input");
+  quantity.type = "number";
+  quantity.min = "0.01";
+  quantity.step = "0.01";
+  quantity.value = "1";
+  quantity.className = "salesProductQuantity";
+  quantity.placeholder = "Quantity";
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.textContent = "REMOVE";
+  remove.className = "reject";
+  remove.onclick = () => row.remove();
+
+  row.append(select, quantity, remove);
+  container.appendChild(row);
+
+  loadSalesProducts();
+}
+
+async function saveProductSale() {
+  const rows = document.querySelectorAll("#salesProductRows > .card");
+  const items = [];
+
+  for (const row of rows) {
+    const productId = row.querySelector(".salesProductSelect").value;
+    const quantity = Number(
+      row.querySelector(".salesProductQuantity").value
+    );
+
+    if (!productId) continue;
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      alert("Enter a valid product quantity.");
+      return;
+    }
+
+    items.push({
+      product_id: productId,
+      quantity: quantity
+    });
+  }
+
+  if (items.length === 0) {
+    alert("Please select at least one product.");
+    return;
+  }
+
+  const discount = Number(
+    document.getElementById("saleDiscount").value || 0
+  );
+
+  if (!Number.isFinite(discount) || discount < 0) {
+    alert("Enter a valid discount.");
+    return;
+  }
+
+  const button = document.getElementById("saveSaleButton");
+  const message = document.getElementById("saleMessage");
+
+  button.disabled = true;
+  button.textContent = "PROCESSING SALE...";
+  message.textContent = "";
+
+  const { data, error } = await db.rpc("create_product_sale", {
+    p_customer_name:
+      document.getElementById("saleCustomerName").value.trim() || null,
+    p_customer_mobile:
+      document.getElementById("saleCustomerMobile").value.trim() || null,
+    p_payment_method:
+      document.getElementById("salePaymentMethod").value,
+    p_discount: discount,
+    p_items: items
+  });
+
+  button.disabled = false;
+  button.textContent = "COMPLETE SALE & GENERATE BILL";
+
+  if (error) {
+    message.textContent = "Sale failed: " + error.message;
+    return;
+  }
+
+  const sale = Array.isArray(data) ? data[0] : data;
+
+  message.textContent =
+    "Sale #" + sale.sale_number +
+    " completed! Total: ₹" +
+    Number(sale.total_amount).toFixed(2);
+
+  alert(message.textContent);
+
+  const saleDetails = {
+    id: sale.id,
+    sale_number: sale.sale_number
+  };
+
+  document.getElementById("saleCustomerName").value = "";
+  document.getElementById("saleCustomerMobile").value = "";
+  document.getElementById("saleDiscount").value = "0";
+  document.getElementById("salesProductRows").replaceChildren();
+
+  addSalesProductRow();
+
+  await loadProducts();
+  await loadInventoryHistory();
+  await loadSalesHistory();
+
+  printProductSale(saleDetails);
+}
+
+async function loadSalesHistory() {
+  const summary = document.getElementById("salesSummary");
+  const history = document.getElementById("salesHistory");
+
+  summary.textContent = "Loading report...";
+  history.textContent = "Loading sales...";
+
+  const { data, error } = await db
+    .from("sales")
+    .select("id,sale_number,customer_name,customer_mobile,subtotal,discount,total_amount,payment_method,sale_date")
+    .order("sale_date", { ascending: false });
+
+  if (error) {
+    summary.textContent = "Report error: " + error.message;
+    history.textContent = "";
+    return;
+  }
+
+  const sales = data || [];
+  const now = new Date();
+
+  const today = now.toLocaleDateString("en-CA");
+  const month = today.slice(0, 7);
+
+  const todaySales = sales.filter(s =>
+    new Date(s.sale_date).toLocaleDateString("en-CA") === today
+  );
+
+  const monthSales = sales.filter(s =>
+    new Date(s.sale_date).toLocaleDateString("en-CA").startsWith(month)
+  );
+
+  const todayTotal = todaySales.reduce(
+    (sum, s) => sum + Number(s.total_amount), 0
+  );
+
+  const monthTotal = monthSales.reduce(
+    (sum, s) => sum + Number(s.total_amount), 0
+  );
+
+  summary.innerHTML = `
+    <div class="card">
+      <h3>TODAY'S SALES</h3>
+      <p>Number of bills: ${todaySales.length}</p>
+      <h2>₹${todayTotal.toFixed(2)}</h2>
+    </div>
+
+    <div class="card">
+      <h3>THIS MONTH'S SALES</h3>
+      <p>Number of bills: ${monthSales.length}</p>
+      <h2>₹${monthTotal.toFixed(2)}</h2>
+    </div>
+  `;
+
+  history.replaceChildren();
+
+  if (!sales.length) {
+    history.textContent = "No sales recorded yet.";
+    return;
+  }
+
+  sales.slice(0, 50).forEach(sale => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = document.createElement("p");
+    details.style.whiteSpace = "pre-line";
+    details.textContent =
+      "SALE #" + sale.sale_number +
+      "\nCustomer: " + (sale.customer_name || "Walk-in customer") +
+      "\nMobile: " + (sale.customer_mobile || "-") +
+      "\nDate: " + new Date(sale.sale_date).toLocaleString("en-IN") +
+      "\nSubtotal: ₹" + Number(sale.subtotal).toFixed(2) +
+      "\nDiscount: ₹" + Number(sale.discount).toFixed(2) +
+      "\nTotal: ₹" + Number(sale.total_amount).toFixed(2) +
+      "\nPayment: " + sale.payment_method.toUpperCase();
+
+    const print = document.createElement("button");
+    print.textContent = "🧾 PRINT BILL";
+    print.onclick = () => printProductSale(sale);
+
+    card.append(details, print);
+    history.appendChild(card);
+  });
+}
+
+async function printProductSale(sale) {
+  const { data: items, error } = await db
+    .from("sale_items")
+    .select("product_name,brand,quantity,unit_price,total_price")
+    .eq("sale_id", sale.id);
+
+  if (error) {
+    alert("Could not load bill items: " + error.message);
+    return;
+  }
+
+  const { data: bill, error: billError } = await db
+    .from("sales")
+    .select("*")
+    .eq("id", sale.id)
+    .single();
+
+  if (billError) {
+    alert("Could not load bill details.");
+    return;
+  }
+
+  const win = window.open("", "_blank");
+
+  if (!win) {
+    alert("Please allow pop-ups to print the bill.");
+    return;
+  }
+
+  const escape = value => String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[c]);
+
+  const rows = (items || []).map(item => `
+    <tr>
+      <td>${escape(item.product_name)} ${escape(item.brand || "")}</td>
+      <td>${item.quantity}</td>
+      <td>₹${Number(item.unit_price).toFixed(2)}</td>
+      <td>₹${Number(item.total_price).toFixed(2)}</td>
+    </tr>
+  `).join("");
+
+  win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>VSC Sale Bill #${bill.sale_number}</title>
+      <style>
+        body { font-family: Arial; margin: 30px; color: #222; }
+        header { background: #101010; color: white; padding: 20px; border-bottom: 6px solid #ffd400; }
+        header span { color: #ffd400; }
+        table { width: 100%; border-collapse: collapse; margin-top: 25px; }
+        th,td { padding: 12px; border: 1px solid #ccc; text-align: left; }
+        .total { text-align: right; margin-top: 25px; }
+        @page { size: A4; margin: 12mm; }
+      </style>
+    </head>
+    <body>
+      <header>
+        <h1>VASU <span>SERVICE CENTER</span></h1>
+        <p>Two-Wheeler Service & Care</p>
+      </header>
+
+      <h2>PRODUCT SALES BILL</h2>
+      <p><b>Bill Number:</b> ${bill.sale_number}</p>
+      <p><b>Date:</b> ${new Date(bill.sale_date).toLocaleString("en-IN")}</p>
+      <p><b>Customer:</b> ${escape(bill.customer_name || "Walk-in customer")}</p>
+      <p><b>Mobile:</b> ${escape(bill.customer_mobile || "-")}</p>
+
+      <table>
+        <thead>
+          <tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      <div class="total">
+        <p>Subtotal: ₹${Number(bill.subtotal).toFixed(2)}</p>
+        <p>Discount: ₹${Number(bill.discount).toFixed(2)}</p>
+        <h2>Grand Total: ₹${Number(bill.total_amount).toFixed(2)}</h2>
+        <p>Payment: ${escape(bill.payment_method.toUpperCase())}</p>
+      </div>
+
+      <hr>
+      <h3>Thank you for choosing Vasu Service Center!</h3>
+      <button onclick="window.print()">PRINT / SAVE AS PDF</button>
+    </body>
+    </html>
+  `);
+
+  win.document.close();
+}
+
+// Install sales feature automatically.
+installSalesSection();
+
+  // ===========================================
+// VASU SERVICE CENTER - MAIN BUSINESS DASHBOARD
+// ===========================================
+
+function installMainDashboard() {
+  if (document.getElementById("mainBusinessDashboard")) return;
+
+  const dashboard = document.getElementById("dashboard");
+
+  const section = document.createElement("div");
+  section.id = "mainBusinessDashboard";
+  section.className = "card";
+
+  section.innerHTML = `
+    <h2>📊 BUSINESS OVERVIEW</h2>
+    <p class="small">Your workshop at a glance.</p>
+
+    <button onclick="loadMainDashboard()">
+      🔄 REFRESH DASHBOARD
+    </button>
+
+    <div id="mainDashboardContent">
+      Loading your business information...
+    </div>
+  `;
+
+  dashboard.insertBefore(section, dashboard.firstElementChild);
+}
+
+async function loadMainDashboard() {
+  const area = document.getElementById("mainDashboardContent");
+
+  area.textContent = "Loading business reports...";
+
+  const results = await Promise.all([
+    db.from("job_cards")
+      .select("id,total_amount,status,payment_status,received_at"),
+
+    db.from("payments")
+      .select("job_card_id,amount,payment_date"),
+
+    db.from("sales")
+      .select("id,total_amount,sale_date"),
+
+    db.from("expenses")
+      .select("amount,expense_date"),
+
+    db.from("products")
+      .select("id,product_name,brand,stock_quantity,minimum_stock")
+  ]);
+
+  const failed = results.find(result => result.error);
+
+  if (failed) {
+    area.textContent =
+      "Dashboard loading error: " + failed.error.message;
+    return;
+  }
+
+  const jobs = results[0].data || [];
+  const payments = results[1].data || [];
+  const sales = results[2].data || [];
+  const expenses = results[3].data || [];
+  const products = results[4].data || [];
+
+  const now = new Date();
+  const today = now.toLocaleDateString("en-CA");
+  const month = today.slice(0, 7);
+
+  const isToday = date =>
+    date && new Date(date).toLocaleDateString("en-CA") === today;
+
+  const isThisMonth = date =>
+    date && new Date(date).toLocaleDateString("en-CA").startsWith(month);
+
+  const todayService = payments
+    .filter(p => isToday(p.payment_date))
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const monthlyService = payments
+    .filter(p => isThisMonth(p.payment_date))
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const todayProduct = sales
+    .filter(s => isToday(s.sale_date))
+    .reduce((sum, s) => sum + Number(s.total_amount), 0);
+
+  const monthlyProduct = sales
+    .filter(s => isThisMonth(s.sale_date))
+    .reduce((sum, s) => sum + Number(s.total_amount), 0);
+
+  const todayExpense = expenses
+    .filter(e => e.expense_date === today)
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const monthlyExpense = expenses
+    .filter(e => e.expense_date.startsWith(month))
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const todayIncome = todayService + todayProduct;
+  const monthlyIncome = monthlyService + monthlyProduct;
+
+  const todayNet = todayIncome - todayExpense;
+  const monthlyNet = monthlyIncome - monthlyExpense;
+
+  const paidByJob = {};
+
+  payments.forEach(payment => {
+    if (!payment.job_card_id) return;
+
+    paidByJob[payment.job_card_id] =
+      (paidByJob[payment.job_card_id] || 0) +
+      Number(payment.amount);
+  });
+
+  const pendingPayments = jobs.reduce((sum, job) => {
+    return sum + Math.max(
+      0,
+      Number(job.total_amount || 0) -
+      (paidByJob[job.id] || 0)
+    );
+  }, 0);
+
+  const completedToday = jobs.filter(job =>
+    job.status === "completed" &&
+    isToday(job.received_at)
+  ).length;
+
+  const completedMonth = jobs.filter(job =>
+    job.status === "completed" &&
+    isThisMonth(job.received_at)
+  ).length;
+
+  const lowStock = products.filter(product =>
+    Number(product.stock_quantity || 0) <=
+    Number(product.minimum_stock || 0)
+  );
+
+  const money = value =>
+    "₹" + Number(value).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+
+  const card = (title, value, subtitle) => `
+    <div class="card">
+      <h3>${title}</h3>
+      <h2>${value}</h2>
+      <p class="small">${subtitle}</p>
+    </div>
+  `;
+
+  area.innerHTML = `
+    <h3>📅 TODAY'S PERFORMANCE</h3>
+
+    ${card("💰 Total Collections", money(todayIncome),
+      "Service payments + product sales")}
+
+    ${card("🔧 Service Collections", money(todayService),
+      "Payments received against job cards")}
+
+    ${card("🛒 Product Sales", money(todayProduct),
+      "Direct product sales")}
+
+    ${card("💸 Expenses", money(todayExpense),
+      "Expenses recorded today")}
+
+    ${card("📈 Net Cash Difference", money(todayNet),
+      "Collections minus recorded expenses")}
+
+    <hr>
+
+    <h3>📊 MONTHLY PERFORMANCE</h3>
+
+    ${card("Monthly Collections", money(monthlyIncome),
+      "Service payments + product sales")}
+
+    ${card("Monthly Service Collections", money(monthlyService),
+      "Job-card payments received")}
+
+    ${card("Monthly Product Sales", money(monthlyProduct),
+      "Direct product sales")}
+
+    ${card("Monthly Expenses", money(monthlyExpense),
+      "Expenses recorded this month")}
+
+    ${card("Monthly Net Difference", money(monthlyNet),
+      "Collections minus recorded expenses")}
+
+    <hr>
+
+    <h3>🏍️ WORKSHOP ACTIVITY</h3>
+
+    ${card("Completed Today", completedToday,
+      "Job cards marked completed today")}
+
+    ${card("Completed This Month", completedMonth,
+      "Job cards received and completed this month")}
+
+    ${card("Pending Payments", money(pendingPayments),
+      "Outstanding balance on all job cards")}
+
+    <hr>
+
+    <h3>⚠️ INVENTORY ALERTS</h3>
+
+    ${card("Low Stock Products", lowStock.length,
+      "Products at or below minimum stock")}
+
+    <div class="card">
+      <h3>LOW STOCK LIST</h3>
+      ${
+        lowStock.length
+          ? lowStock.map(p =>
+              "<p>" +
+              p.product_name + " (" + (p.brand || "-") + ")" +
+              "<br>Available: " + p.stock_quantity +
+              " | Minimum: " + p.minimum_stock +
+              "</p>"
+            ).join("")
+          : "<p>All products are above minimum stock. ✅</p>"
+      }
+    </div>
+
+    <p class="small">
+      Financial figures show recorded collections and expenses,
+      not audited accounting profit. Unpaid job cards are excluded
+      from collections. Product sales and job-card payments are
+      counted separately.
+    </p>
+  `;
+}
+
+// Install dashboard automatically.
+installMainDashboard();
+
+  // ======================================
+// VSC CUSTOMER SERVICE HISTORY & REMINDERS
+// ======================================
+
+function installCustomerServiceTools() {
+  if (document.getElementById("customerServiceTools")) return;
+
+  const customerCard = document
+    .getElementById("customers")
+    .closest(".card");
+
+  const section = document.createElement("div");
+  section.className = "card";
+  section.id = "customerServiceTools";
+
+  section.innerHTML = `
+    <h2>🏍️ BIKE SERVICE HISTORY & REMINDERS</h2>
+
+    <input
+      id="bikeHistorySearch"
+      placeholder="Enter bike registration number..."
+    >
+
+    <button onclick="searchBikeHistory()">
+      SEARCH BIKE
+    </button>
+
+    <div id="bikeHistoryResults">
+      Search a registration number to view its details.
+    </div>
+  `;
+
+  customerCard.insertAdjacentElement("afterend", section);
+}
+
+async function searchBikeHistory() {
+  const search = document
+    .getElementById("bikeHistorySearch")
+    .value.trim()
+    .toUpperCase();
+
+  const area = document.getElementById("bikeHistoryResults");
+
+  if (!search) {
+    area.textContent = "Enter a registration number.";
+    return;
+  }
+
+  area.textContent = "Searching...";
+
+  const { data: bikes, error } = await db
+    .from("bikes")
+    .select("id,customer_id,brand,model,registration_number")
+    .ilike("registration_number", "%" + search + "%");
+
+  if (error) {
+    area.textContent = "Search failed: " + error.message;
+    return;
+  }
+
+  area.replaceChildren();
+
+  if (!bikes || !bikes.length) {
+    area.textContent = "No matching bikes found.";
+    return;
+  }
+
+  for (const bike of bikes) {
+    const [customerResult, jobsResult] = await Promise.all([
+      db.from("customers")
+        .select("id,full_name,mobile")
+        .eq("id", bike.customer_id)
+        .single(),
+
+      db.from("job_cards")
+        .select("id,job_number,received_at,status,total_amount,work_performed,next_service_date")
+        .eq("bike_id", bike.id)
+        .order("received_at", { ascending: false })
+    ]);
+
+    if (customerResult.error || jobsResult.error) {
+      const errorCard = document.createElement("p");
+      errorCard.textContent =
+        "Could not load bike history: " +
+        (customerResult.error || jobsResult.error).message;
+      area.appendChild(errorCard);
+      continue;
+    }
+
+    const customer = customerResult.data;
+    const jobs = jobsResult.data || [];
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const title = document.createElement("h3");
+    title.textContent =
+      bike.brand + " " + bike.model;
+
+    const details = document.createElement("p");
+    details.style.whiteSpace = "pre-line";
+
+    details.textContent =
+      "Registration: " + bike.registration_number +
+      "\nCustomer: " + customer.full_name +
+      "\nMobile: " + customer.mobile +
+      "\nTotal service visits: " + jobs.length;
+
+    card.append(title, details);
+
+    const historyTitle = document.createElement("h3");
+    historyTitle.textContent = "📋 SERVICE HISTORY";
+    card.appendChild(historyTitle);
+
+    if (!jobs.length) {
+      const empty = document.createElement("p");
+      empty.textContent = "No job cards found for this bike.";
+      card.appendChild(empty);
+    }
+
+    jobs.forEach(job => {
+      const item = document.createElement("p");
+      item.style.whiteSpace = "pre-line";
+
+      item.textContent =
+        "Job #" + job.job_number +
+        "\nDate: " + new Date(job.received_at).toLocaleDateString("en-IN") +
+        "\nStatus: " + job.status +
+        "\nWork: " + (job.work_performed || "-") +
+        "\nAmount: ₹" + Number(job.total_amount || 0).toFixed(2) +
+        "\nNext service: " + (job.next_service_date || "Not scheduled");
+
+      card.appendChild(item);
+    });
+
+    if (jobs.length) {
+      const latestJob = jobs[0];
+
+      const reminderTitle = document.createElement("h3");
+      reminderTitle.textContent = "🔔 NEXT SERVICE REMINDER";
+      card.appendChild(reminderTitle);
+
+      const dateInput = document.createElement("input");
+      dateInput.type = "date";
+      dateInput.value = latestJob.next_service_date || "";
+
+      const saveButton = document.createElement("button");
+      saveButton.textContent = "SAVE NEXT SERVICE DATE";
+
+      saveButton.onclick = async () => {
+        if (!dateInput.value) {
+          alert("Please select a service date.");
+          return;
+        }
+
+        const { error } = await db
+          .from("job_cards")
+          .update({ next_service_date: dateInput.value })
+          .eq("id", latestJob.id);
+
+        if (error) {
+          alert("Could not save date: " + error.message);
+          return;
+        }
+
+        alert("Next service date saved!");
+        await searchBikeHistory();
+      };
+
+      card.append(dateInput, saveButton);
+
+      const whatsapp = document.createElement("button");
+      whatsapp.textContent = "💬 WHATSAPP SERVICE REMINDER";
+
+      whatsapp.onclick = () => {
+        const mobile = String(customer.mobile || "")
+          .replace(/\D/g, "");
+
+        if (!mobile) {
+          alert("Customer mobile number is missing.");
+          return;
+        }
+
+        const number = mobile.length === 10
+          ? "91" + mobile
+          : mobile;
+
+        const message =
+          "Hello " + customer.full_name +
+          "! This is Vasu Service Center. " +
+          "Your " + bike.brand + " " + bike.model +
+          " (" + bike.registration_number + ")" +
+          " is due for its next service on " +
+          dateInput.value +
+          ". Please contact us to book your service. Thank you!";
+
+        window.open(
+          "https://wa.me/" + number +
+          "?text=" + encodeURIComponent(message),
+          "_blank"
+        );
+      };
+
+      card.appendChild(whatsapp);
+    }
+
+    area.appendChild(card);
+  }
+}
+
+// Install customer service tools.
+installCustomerServiceTools();
+  
+  async function start() {
+  const {data} = await db.auth.getSession();
+
+  if(data.session) {
+    await checkOwner(data.session.user);
+  }
+}
+
+start();
+</script>
+
+</body>
+</html>
