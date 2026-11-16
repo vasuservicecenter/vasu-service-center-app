@@ -42,6 +42,23 @@ button{padding:12px 17px;border:0;border-radius:5px;background:var(--yellow);fon
   <button onclick="login()">LOGIN</button>
 </div>
 
+<div id="mechanicDashboard" class="hidden">
+
+  <div class="card">
+    <h2>🔧 MECHANIC WORKSPACE</h2>
+    <p>Welcome, <span id="mechanicName">Mechanic</span>!</p>
+    <p class="small">Your assigned workshop jobs</p>
+    <button onclick="loadMechanicJobs()">REFRESH JOBS</button>
+    <button class="secondary" onclick="logout()">LOGOUT</button>
+  </div>
+
+  <div class="card">
+    <h3>🏍️ MY ASSIGNED JOBS</h3>
+    <div id="mechanicJobs">Loading assigned jobs...</div>
+  </div>
+
+</div>
+
 <div id="dashboard" class="hidden">
   <div class="card">
     <h2>Welcome, <span id="ownerName">Owner</span>!</h2>
