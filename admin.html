@@ -1921,9 +1921,14 @@ async function updateBooking(id,status) {
 
 async function logout() {
   await db.auth.signOut();
+
   currentUser = null;
+
   dashboard.classList.add("hidden");
+  document.getElementById("mechanicDashboard").classList.add("hidden");
+
   loginBox.classList.remove("hidden");
+
   showMessage("Logged out.");
 }
 // ===================================
