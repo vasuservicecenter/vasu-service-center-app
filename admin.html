@@ -261,44 +261,57 @@ async function login() {
 }
 
 async function checkOwner(user) {
-  if(!user) {
+  if (!user) {
     showMessage("Please log in.");
     return;
   }
 
   showMessage("Checking account permissions...");
 
-  const {data,error} = await db
+  const { data, error } = await db
     .from("admin_accounts")
     .select("id,full_name,role,is_active")
-    .eq("id",user.id)
+    .eq("id", user.id)
     .maybeSingle();
 
-  if(error){
+  if (error) {
     showMessage("Account check error: " + error.message);
     return;
-}
+  }
 
-if(!data){
-    showMessage("No admin account found for this login.");
+  if (!data) {
+    showMessage("No admin account found for this user.");
     return;
-}
+  }
 
-if(data.is_active!==true || !["owner","staff"].includes(data.role)){
+  const role = String(data.role || "").toLowerCase();
+
+  if (data.is_active !== true || !["owner", "mechanic"].includes(role)) {
     showMessage("Account inactive or role not authorised.");
     return;
-}
+  }
 
   currentUser = user;
-
-  document.getElementById("ownerName").textContent =
-    data.full_name || "Owner";
-
   loginBox.classList.add("hidden");
-  dashboard.classList.remove("hidden");
 
-  await loadBookings();
-  await loadPaymentJobCards();
+  if (role === "owner") {
+    document.getElementById("mechanicDashboard").classList.add("hidden");
+    document.getElementById("ownerName").textContent =
+      data.full_name || "Owner";
+
+    dashboard.classList.remove("hidden");
+
+    await loadBookings();
+    await loadPaymentJobCards();
+    return;
+  }
+
+  dashboard.classList.add("hidden");
+  document.getElementById("mechanicDashboard").classList.remove("hidden");
+  document.getElementById("mechanicName").textContent =
+    data.full_name || "Mechanic";
+
+  await loadMechanicJobs();
 }
 
 async function loadCustomers() {
@@ -3004,7 +3017,55 @@ async function searchBikeHistory() {
 
 // Install customer service tools.
 installCustomerServiceTools();
-  
+
+  async function loadMechanicJobs() {
+  const area = document.getElementById("mechanicJobs");
+
+  area.textContent = "Loading your assigned jobs...";
+
+  const { data, error } = await db.rpc("get_my_workshop_jobs");
+
+  if (error) {
+    area.textContent = "Could not load jobs: " + error.message;
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    area.textContent = "No jobs assigned to you yet.";
+    return;
+  }
+
+  area.innerHTML = "";
+
+  data.forEach(job => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const details = [
+      "Job #" + (job.job_number || ""),
+      "Customer: " + (job.customer_name || ""),
+      "Mobile: " + (job.customer_mobile || ""),
+      "Bike: " + (job.bike_brand || "") + " " + (job.bike_model || ""),
+      "Registration: " + (job.bike_registration || ""),
+      "Status: " + (job.status || ""),
+      "Complaint: " + (job.customer_complaint || "Not specified"),
+      "Observations: " + (job.mechanic_observations || "Not added"),
+      "Work performed: " + (job.work_performed || "Not added")
+    ];
+
+    const heading = document.createElement("h3");
+    heading.textContent = "🔧 " + (job.job_number || "Workshop Job");
+    card.appendChild(heading);
+
+    details.slice(1).forEach(detail => {
+      const p = document.createElement("p");
+      p.textContent = detail;
+      card.appendChild(p);
+    });
+
+    area.appendChild(card);
+  });
+}
   async function start() {
   const {data} = await db.auth.getSession();
 
