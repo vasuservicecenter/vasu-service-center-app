@@ -681,30 +681,14 @@ async function loadJobCards() {
   const area = document.getElementById("jobCards");
   area.textContent = "Loading job cards...";
 
-  const { data: jobs, error } = await db
-    .from("job_cards")
-    .select(`
-      id,
-      job_number,
-      customer_id,
-      bike_id,
-      status,
-      total_amount,
-      payment_status,
-      received_at,
-      labour_charge,
-      discount,
-      customer_complaint,
-      mechanic_observations,
-      work_performed,
-      mechanic_name
-    `)
-    .order("received_at", { ascending: false });
+    const { data: ownerData, error } = await db.rpc("get_owner_job_cards");
 
   if (error) {
     area.textContent = "Could not load job cards: " + error.message;
     return;
   }
+
+  const jobs = ownerData?.jobs || [];
 
   area.replaceChildren();
 
@@ -713,23 +697,20 @@ async function loadJobCards() {
     return;
   }
 
-  const customerIds = [...new Set(jobs.map(j => j.customer_id))];
-  const bikeIds = [...new Set(jobs.map(j => j.bike_id))];
-  const jobIds = jobs.map(j => j.id);
+  const customerResult = {
+    data: ownerData?.customers || [],
+    error: null
+  };
 
-  const [customerResult, bikeResult, itemResult] = await Promise.all([
-    db.from("customers")
-      .select("id, full_name, mobile")
-      .in("id", customerIds),
+  const bikeResult = {
+    data: ownerData?.bikes || [],
+    error: null
+  };
 
-    db.from("bikes")
-      .select("id, brand, model, registration_number")
-      .in("id", bikeIds),
-
-    db.from("job_card_items")
-      .select("job_card_id, item_name, brand, quantity, unit_price, total_price, item_type")
-      .in("job_card_id", jobIds)
-  ]);
+  const itemResult = {
+    data: ownerData?.items || [],
+    error: null
+  };
 
   if (customerResult.error || bikeResult.error || itemResult.error) {
     area.textContent =
